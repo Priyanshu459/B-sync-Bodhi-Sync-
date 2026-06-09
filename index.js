@@ -53,7 +53,8 @@ function createWindow() {
     width: 1200,
     height: 800,
     frame: false, // Frameless for custom titlebar
-    backgroundColor: '#1E1E1E', // Solid fallback background
+    backgroundColor: '#00000000', // Needs to be transparent hex to show the material
+    backgroundMaterial: 'acrylic', // Restored the frosted glass effect!
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -68,7 +69,8 @@ function createWindow() {
     height: 450,
     parent: mainWindow,
     frame: false,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#00000000',
+    backgroundMaterial: 'acrylic',
     show: false,
     skipTaskbar: true,
     webPreferences: {
@@ -103,7 +105,8 @@ function createWindow() {
     height: 380,
     parent: mainWindow,
     frame: false,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#00000000',
+    backgroundMaterial: 'acrylic',
     show: false,
     skipTaskbar: true,
     webPreferences: {
