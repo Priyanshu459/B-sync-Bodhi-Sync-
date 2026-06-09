@@ -6,6 +6,8 @@ const path = require('path');
 const fs = require('fs');
 
 app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('no-sandbox');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
 
 process.on('uncaughtException', (error) => {
   fs.writeFileSync(path.join(app.getPath('userData'), 'b-sync-crash.log'), error.stack || error.toString());
