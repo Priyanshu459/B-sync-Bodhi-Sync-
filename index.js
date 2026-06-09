@@ -54,7 +54,7 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
   let paletteWindow = new BrowserWindow({
     width: 600,
@@ -70,7 +70,7 @@ function createWindow() {
       nodeIntegration: false
     }
   });
-  paletteWindow.loadFile('palette.html');
+  paletteWindow.loadFile(path.join(__dirname, 'palette.html'));
   paletteWindow.on('blur', () => paletteWindow.hide());
 
   function showPalette() {
@@ -105,7 +105,7 @@ function createWindow() {
       nodeIntegration: false
     }
   });
-  syncWindow.loadFile('sync.html');
+  syncWindow.loadFile(path.join(__dirname, 'sync.html'));
   syncWindow.on('blur', () => syncWindow.hide());
 
   function showSync() {
@@ -488,7 +488,7 @@ app.whenReady().then(() => {
   ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
     blocker.enableBlockingInSession(session.defaultSession);
     console.log('Ad blocker enabled!');
-  });
+  }).catch(err => console.log('Adblocker failed to load:', err.message));
 
   createWindow();
 
