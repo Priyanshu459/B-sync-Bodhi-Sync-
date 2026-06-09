@@ -5,6 +5,15 @@ const fetch = require('cross-fetch');
 const path = require('path');
 const fs = require('fs');
 
+app.disableHardwareAcceleration();
+
+process.on('uncaughtException', (error) => {
+  fs.writeFileSync(path.join(app.getPath('userData'), 'b-sync-crash.log'), error.stack || error.toString());
+});
+process.on('unhandledRejection', (reason) => {
+  fs.writeFileSync(path.join(app.getPath('userData'), 'b-sync-rejection.log'), reason && reason.stack ? reason.stack : String(reason));
+});
+
 let bookmarks = [];
 let history = [];
 let bookmarksPath = '';
@@ -44,9 +53,7 @@ function createWindow() {
     width: 1200,
     height: 800,
     frame: false, // Frameless for custom titlebar
-    transparent: true, // Set to true to allow complete see-through
-    backgroundColor: '#00000000', // Ensure Electron window itself has no background color
-    backgroundMaterial: 'acrylic', // Acrylic gives the frosted glass look
+    backgroundColor: '#1E1E1E', // Solid fallback background
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -61,7 +68,7 @@ function createWindow() {
     height: 450,
     parent: mainWindow,
     frame: false,
-    transparent: true,
+    backgroundColor: '#1E1E1E',
     show: false,
     skipTaskbar: true,
     webPreferences: {
@@ -96,7 +103,7 @@ function createWindow() {
     height: 380,
     parent: mainWindow,
     frame: false,
-    transparent: true,
+    backgroundColor: '#1E1E1E',
     show: false,
     skipTaskbar: true,
     webPreferences: {
