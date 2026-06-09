@@ -5,8 +5,6 @@ const fetch = require('cross-fetch');
 const path = require('path');
 const fs = require('fs');
 
-app.disableHardwareAcceleration();
-
 process.on('uncaughtException', (error) => {
   fs.writeFileSync(path.join(app.getPath('userData'), 'b-sync-crash.log'), error.stack || error.toString());
 });
@@ -52,9 +50,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    frame: false, // Frameless for custom titlebar
-    backgroundColor: '#00000000', // Needs to be transparent hex to show the material
-    backgroundMaterial: 'acrylic', // Restored the frosted glass effect!
+    frame: false,
+    backgroundColor: '#1E1E1E',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -69,8 +66,7 @@ function createWindow() {
     height: 450,
     parent: mainWindow,
     frame: false,
-    backgroundColor: '#00000000',
-    backgroundMaterial: 'acrylic',
+    backgroundColor: '#1E1E1E',
     show: false,
     skipTaskbar: true,
     webPreferences: {
@@ -105,8 +101,7 @@ function createWindow() {
     height: 380,
     parent: mainWindow,
     frame: false,
-    backgroundColor: '#00000000',
-    backgroundMaterial: 'acrylic',
+    backgroundColor: '#1E1E1E',
     show: false,
     skipTaskbar: true,
     webPreferences: {

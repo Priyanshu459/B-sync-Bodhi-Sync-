@@ -1,6 +1,6 @@
 {
   "name": "b-sync",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Bodhi Sync Browser",
   "main": "index.js",
   "scripts": {
