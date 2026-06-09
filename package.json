@@ -27,13 +27,13 @@
       "target": "nsis"
     }
   },
-  "devDependencies": {
-    "electron": "^42.3.3",
-    "electron-builder": "^26.15.2"
-  },
   "dependencies": {
     "@ghostery/adblocker-electron": "^2.18.0",
-    "cross-fetch": "^4.1.0",
-    "electron-updater": "^6.8.9"
+    "cross-fetch": "^4.0.0",
+    "electron-updater": "^6.1.8"
+  },
+  "devDependencies": {
+    "electron": "^42.3.3",
+    "electron-builder": "^24.13.3"
   }
 }
