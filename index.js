@@ -246,6 +246,14 @@ function createWindow() {
         }
       }
     });
+
+    // Prevent popups and enforce them to open as new tabs
+    view.webContents.setWindowOpenHandler(({ url }) => {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        createTab(url);
+      }
+      return { action: 'deny' };
+    });
   }
 
   // Tab Management Functions
