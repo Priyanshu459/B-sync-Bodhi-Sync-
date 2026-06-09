@@ -11,7 +11,14 @@ function renderPaletteResults(query) {
   
   query = query.toLowerCase().trim();
 
-  if (query) {
+  if (query === '/vault') {
+    paletteItems.push({
+      type: 'Command',
+      title: 'Open Secure Password Vault',
+      desc: 'Unlock your encrypted passwords',
+      action: { type: 'open-vault' }
+    });
+  } else if (query) {
     paletteItems.push({
       type: 'Search',
       title: `Search for "${query}"`,

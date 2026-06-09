@@ -25,6 +25,7 @@ const db = new sqlite3.Database(DB_FILE, (err) => {
       user_id INTEGER PRIMARY KEY,
       bookmarks TEXT,
       history TEXT,
+      vault TEXT,
       FOREIGN KEY(user_id) REFERENCES users(id)
     )`);
   }
@@ -57,7 +58,7 @@ app.post('/api/auth/register', (req, res) => {
     }
     
     // Initialize empty userdata
-    db.run('INSERT INTO userdata (user_id, bookmarks, history) VALUES (?, ?, ?)', [this.lastID, '[]', '[]']);
+    db.run('INSERT INTO userdata (user_id, bookmarks, history, vault) VALUES (?, ?, ?, ?)', [this.lastID, '[]', '[]', '[]']);
     
     res.json({ message: 'User registered successfully' });
   });
@@ -80,23 +81,24 @@ app.post('/api/auth/login', (req, res) => {
 
 // Pull Data
 app.get('/api/sync/data', authenticateToken, (req, res) => {
-  db.get('SELECT bookmarks, history FROM userdata WHERE user_id = ?', [req.user.id], (err, row) => {
+  db.get('SELECT bookmarks, history, vault FROM userdata WHERE user_id = ?', [req.user.id], (err, row) => {
     if (err || !row) return res.status(500).json({ error: 'Failed to fetch data' });
     
     res.json({
       bookmarks: JSON.parse(row.bookmarks || '[]'),
-      history: JSON.parse(row.history || '[]')
+      history: JSON.parse(row.history || '[]'),
+      vault: JSON.parse(row.vault || '[]')
     });
   });
 });
 
 // Push Data
 app.post('/api/sync/data', authenticateToken, (req, res) => {
-  const { bookmarks, history } = req.body;
+  const { bookmarks, history, vault } = req.body;
   
   db.run(
-    'UPDATE userdata SET bookmarks = ?, history = ? WHERE user_id = ?',
-    [JSON.stringify(bookmarks), JSON.stringify(history), req.user.id],
+    'UPDATE userdata SET bookmarks = ?, history = ?, vault = ? WHERE user_id = ?',
+    [JSON.stringify(bookmarks), JSON.stringify(history), JSON.stringify(vault), req.user.id],
     function(err) {
       if (err) return res.status(500).json({ error: 'Failed to save data' });
       res.json({ message: 'Data synced successfully' });

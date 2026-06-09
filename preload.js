@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('api', {
   windowMinimize: () => ipcRenderer.send('window-minimize'),
   windowMaximize: () => ipcRenderer.send('window-maximize'),
   windowClose: () => ipcRenderer.send('window-close'),
+  logError: (msg) => ipcRenderer.send('log-error', msg),
   
   navigate: (url) => ipcRenderer.send('navigate', url),
   goBack: () => ipcRenderer.send('go-back'),
@@ -23,6 +24,7 @@ contextBridge.exposeInMainWorld('api', {
 
   openPalette: () => ipcRenderer.send('open-palette'),
   openSync: () => ipcRenderer.send('open-sync'),
+  openIncognito: () => ipcRenderer.send('open-incognito'),
 
   // Library
   getData: () => ipcRenderer.invoke('get-data'),
@@ -36,5 +38,16 @@ contextBridge.exposeInMainWorld('api', {
   authLogin: (username, password) => ipcRenderer.invoke('auth-login', { username, password }),
   syncPush: (token) => ipcRenderer.invoke('sync-push', token),
   syncPull: (token) => ipcRenderer.invoke('sync-pull', token),
-  onSyncPulled: (callback) => ipcRenderer.on('sync-pulled', (_event, data) => callback(data))
+  onSyncPulled: (callback) => ipcRenderer.on('sync-pulled', (_event, data) => callback(data)),
+
+  // Vault
+  vaultUnlock: (masterPassword) => ipcRenderer.invoke('vault-unlock', masterPassword),
+  vaultSave: (dataArray, masterPassword) => ipcRenderer.invoke('vault-save', { dataArray, masterPassword }),
+  onOpenVault: (callback) => ipcRenderer.on('open-vault', () => callback()),
+
+  // Downloads
+  onDownloadStarted: (callback) => ipcRenderer.on('download-started', (_event, info) => callback(info)),
+  onDownloadProgress: (callback) => ipcRenderer.on('download-progress', (_event, info) => callback(info)),
+  onDownloadDone: (callback) => ipcRenderer.on('download-done', (_event, info) => callback(info)),
+  onDownloadInterrupted: (callback) => ipcRenderer.on('download-interrupted', (_event, filename) => callback(filename))
 });
