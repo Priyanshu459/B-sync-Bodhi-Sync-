@@ -20,9 +20,11 @@ process.on('unhandledRejection', (reason) => {
 let bookmarks = [];
 let history = [];
 let vault = [];
+let settings = { searchEngine: 'google' };
 let bookmarksPath = '';
 let historyPath = '';
 let vaultPath = '';
+let settingsPath = '';
 
 const ALGORITHM = 'aes-256-gcm';
 function deriveKey(masterPassword) {
@@ -56,11 +58,27 @@ function loadData() {
   try { if (fs.existsSync(bookmarksPath)) bookmarks = JSON.parse(fs.readFileSync(bookmarksPath, 'utf8')); } catch(e){}
   try { if (fs.existsSync(historyPath)) history = JSON.parse(fs.readFileSync(historyPath, 'utf8')); } catch(e){}
   try { if (fs.existsSync(vaultPath)) vault = JSON.parse(fs.readFileSync(vaultPath, 'utf8')); } catch(e){}
+  try { if (fs.existsSync(settingsPath)) settings = Object.assign(settings, JSON.parse(fs.readFileSync(settingsPath, 'utf8'))); } catch(e){}
 }
 function saveData() {
   fs.writeFileSync(bookmarksPath, JSON.stringify(bookmarks));
   fs.writeFileSync(historyPath, JSON.stringify(history));
   fs.writeFileSync(vaultPath, JSON.stringify(vault));
+  fs.writeFileSync(settingsPath, JSON.stringify(settings));
+}
+
+function getSearchUrl(query) {
+  if (settings.searchEngine === 'bing') return `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
+  if (settings.searchEngine === 'brave') return `https://search.brave.com/search?q=${encodeURIComponent(query)}`;
+  if (settings.searchEngine === 'duckduckgo') return `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+}
+
+function getHomepageUrl() {
+  if (settings.searchEngine === 'bing') return 'https://www.bing.com';
+  if (settings.searchEngine === 'brave') return 'https://search.brave.com';
+  if (settings.searchEngine === 'duckduckgo') return 'https://duckduckgo.com';
+  return 'https://www.google.com';
 }
 
 function recordHistory(url, title) {
@@ -364,7 +382,7 @@ function createBrowserWindow(isIncognito = false) {
   
   win.once('ready-to-show', () => {
     win.show();
-    createTab('https://www.google.com', win);
+    createTab(getHomepageUrl(), win);
   });
 
   win.loadFile(path.join(__dirname, 'index.html'));
@@ -375,6 +393,7 @@ function createBrowserWindow(isIncognito = false) {
 bookmarksPath = path.join(app.getPath('userData'), 'bookmarks.json');
 historyPath = path.join(app.getPath('userData'), 'history.json');
 vaultPath = path.join(app.getPath('userData'), 'vault_encrypted.json');
+settingsPath = path.join(app.getPath('userData'), 'settings.json');
 loadData();
 
 // IPC Listeners
@@ -383,6 +402,36 @@ ipcMain.on('open-incognito', () => createBrowserWindow(true));
 ipcMain.on('window-minimize', (event) => {
   const win = getMainWindowFromEvent(event);
   if (win) win.minimize();
+});
+
+ipcMain.on('modal-opened', (event) => {
+  const win = getMainWindowFromEvent(event);
+  if (!win) return;
+  const state = getWindowState(win);
+  if (state.activeTabId && state.tabs.has(state.activeTabId)) {
+    const tab = state.tabs.get(state.activeTabId);
+    if (tab.view) {
+      try { win.contentView.removeChildView(tab.view); } catch(e) {}
+    }
+    if (tab.splitView) {
+      try { win.contentView.removeChildView(tab.splitView); } catch(e) {}
+    }
+  }
+});
+
+ipcMain.on('modal-closed', (event) => {
+  const win = getMainWindowFromEvent(event);
+  if (!win) return;
+  const state = getWindowState(win);
+  if (state.activeTabId && state.tabs.has(state.activeTabId)) {
+    const tab = state.tabs.get(state.activeTabId);
+    if (tab.view) {
+      try { win.contentView.addChildView(tab.view); } catch(e) {}
+    }
+    if (tab.splitView) {
+      try { win.contentView.addChildView(tab.splitView); } catch(e) {}
+    }
+  }
 });
 
 ipcMain.on('window-maximize', (event) => {
@@ -415,7 +464,7 @@ ipcMain.on('navigate', (event, url) => {
     if (finalUrl.includes('.') && !finalUrl.includes(' ')) {
         finalUrl = `https://${finalUrl}`;
     } else {
-        finalUrl = `https://www.google.com/search?q=${encodeURIComponent(finalUrl)}`;
+        finalUrl = getSearchUrl(finalUrl);
     }
   }
   wc.loadURL(finalUrl);
@@ -453,7 +502,7 @@ ipcMain.on('reload', (event) => {
 
 ipcMain.on('new-tab', (event) => {
   const win = getMainWindowFromEvent(event);
-  if (win) createTab('https://www.google.com', win);
+  if (win) createTab(getHomepageUrl(), win);
 });
 
 ipcMain.on('switch-tab', (event, id) => {
@@ -513,7 +562,7 @@ ipcMain.on('palette-action', (event, action) => {
       if (finalUrl.includes('.') && !finalUrl.includes(' ')) {
         finalUrl = `https://${finalUrl}`;
       } else {
-        finalUrl = `https://www.google.com/search?q=${encodeURIComponent(finalUrl)}`;
+        finalUrl = getSearchUrl(finalUrl);
       }
     }
     if (!state.activeTabId || !state.tabs.has(state.activeTabId)) return;
@@ -524,6 +573,12 @@ ipcMain.on('palette-action', (event, action) => {
 });
 
 // Library IPC Handlers
+ipcMain.handle('get-settings', () => settings);
+ipcMain.handle('update-setting', (event, { key, value }) => {
+  settings[key] = value;
+  saveData();
+  return settings;
+});
 ipcMain.handle('get-data', () => ({ bookmarks, history }));
 ipcMain.handle('toggle-bookmark', (event, { url, title }) => {
   const index = bookmarks.findIndex(b => b.url === url);

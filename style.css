@@ -542,7 +542,7 @@ body {
 }
 
 /* Vault Overlay */
-#vault-overlay {
+#vault-overlay, #settings-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -556,7 +556,7 @@ body {
   justify-content: center;
 }
 
-#vault-overlay.hidden {
+#vault-overlay.hidden, #settings-overlay.hidden {
   display: none;
 }
 

@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('api', {
   goForward: () => ipcRenderer.send('go-forward'),
   reload: () => ipcRenderer.send('reload'),
   onUrlUpdated: (callback) => ipcRenderer.on('url-updated', (_event, url) => callback(url)),
+  modalOpened: () => ipcRenderer.send('modal-opened'),
+  modalClosed: () => ipcRenderer.send('modal-closed'),
 
   // Tab Management
   newTab: () => ipcRenderer.send('new-tab'),
@@ -28,6 +30,8 @@ contextBridge.exposeInMainWorld('api', {
 
   // Library
   getData: () => ipcRenderer.invoke('get-data'),
+  getSettings: () => ipcRenderer.invoke('get-settings'),
+  updateSetting: (key, value) => ipcRenderer.invoke('update-setting', { key, value }),
   toggleBookmark: (url, title) => ipcRenderer.invoke('toggle-bookmark', { url, title }),
   clearHistory: () => ipcRenderer.invoke('clear-history'),
   deleteHistoryItem: (index) => ipcRenderer.invoke('delete-history-item', index),

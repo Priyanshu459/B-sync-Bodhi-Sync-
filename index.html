@@ -47,6 +47,7 @@
     <button id="btn-new-tab" class="new-tab-btn"><i class="ph ph-plus"></i> New Tab</button>
     <button id="btn-incognito" class="new-tab-btn" style="margin-top: -10px; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1);"><i class="ph ph-mask-happy"></i> Incognito</button>
     <button id="btn-sync" class="new-tab-btn" style="margin-top: -10px; background: rgba(0,255,100,0.1); border-color: rgba(0,255,100,0.2);"><i class="ph ph-cloud"></i> Bodhi Sync</button>
+    <button id="btn-settings" class="new-tab-btn" style="margin-top: -10px; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1);"><i class="ph ph-gear"></i> Settings</button>
     <div class="tabs-header" style="font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; margin-left: 5px;">Open Tabs</div>
     <div id="tabs-container"></div>
     
@@ -64,6 +65,26 @@
     <div id="command-palette">
       <input type="text" id="palette-input" placeholder="Search tabs, bookmarks, history, or type /vault..." autocomplete="off" spellcheck="false">
       <div id="palette-results"></div>
+    </div>
+  </div>
+
+  <!-- Settings Overlay -->
+  <div id="settings-overlay" class="hidden">
+    <div id="settings-modal" style="background: var(--bg-dark); border: 1px solid var(--border-light); padding: 20px; border-radius: 8px; width: 400px; margin: 100px auto;">
+      <div class="vault-header">
+        <h2><i class="ph ph-gear"></i> Browser Settings</h2>
+        <button id="btn-close-settings" class="icon-btn"><i class="ph ph-x"></i></button>
+      </div>
+      <div style="margin-top: 20px;">
+        <label for="search-engine-select" style="display: block; margin-bottom: 8px; color: rgba(255,255,255,0.8);">Default Search Engine:</label>
+        <select id="search-engine-select" style="width: 100%; padding: 10px; background: var(--bg-main); border: 1px solid var(--border-light); color: white; border-radius: 4px; margin-bottom: 20px;">
+          <option value="google" style="background: var(--bg-main); color: white;">Google</option>
+          <option value="bing" style="background: var(--bg-main); color: white;">Bing</option>
+          <option value="brave" style="background: var(--bg-main); color: white;">Brave Search</option>
+          <option value="duckduckgo" style="background: var(--bg-main); color: white;">DuckDuckGo</option>
+        </select>
+        <button id="btn-save-settings" class="btn-primary" style="width: 100%;">Save Changes</button>
+      </div>
     </div>
   </div>
 

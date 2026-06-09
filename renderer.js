@@ -369,6 +369,36 @@ window.api.onDownloadInterrupted((filename) => {
   }
 });
 
+// Settings Logic
+const btnSettings = document.getElementById('btn-settings');
+const settingsOverlay = document.getElementById('settings-overlay');
+const btnCloseSettings = document.getElementById('btn-close-settings');
+const searchEngineSelect = document.getElementById('search-engine-select');
+
+const btnSaveSettings = document.getElementById('btn-save-settings');
+
+btnSettings.addEventListener('click', async () => {
+  window.api.modalOpened();
+  const settings = await window.api.getSettings();
+  searchEngineSelect.value = settings.searchEngine || 'google';
+  settingsOverlay.classList.remove('hidden');
+});
+
+btnCloseSettings.addEventListener('click', () => {
+  settingsOverlay.classList.add('hidden');
+  window.api.modalClosed();
+});
+
+btnSaveSettings.addEventListener('click', async () => {
+  await window.api.updateSetting('searchEngine', searchEngineSelect.value);
+  settingsOverlay.classList.add('hidden');
+  window.api.modalClosed();
+});
+
+searchEngineSelect.addEventListener('change', async (e) => {
+  await window.api.updateSetting('searchEngine', e.target.value);
+});
+
 // Vault Logic
 const vaultOverlay = document.getElementById('vault-overlay');
 const btnCloseVault = document.getElementById('btn-close-vault');
@@ -388,7 +418,13 @@ function openVault() {
 }
 
 window.api.onOpenVault(() => {
-  openVault();
+  window.api.modalOpened();
+  vaultLogin.classList.remove('hidden');
+  vaultContent.classList.add('hidden');
+  vaultOverlay.classList.remove('hidden');
+  vaultMasterPwd.value = '';
+  vaultError.style.display = 'none';
+  decryptedVault = [];
 });
 
 btnCloseVault.addEventListener('click', () => {
@@ -398,6 +434,7 @@ btnCloseVault.addEventListener('click', () => {
   vaultMasterPwd.value = '';
   currentMasterPassword = '';
   decryptedVault = [];
+  window.api.modalClosed();
 });
 
 btnUnlockVault.addEventListener('click', async () => {
