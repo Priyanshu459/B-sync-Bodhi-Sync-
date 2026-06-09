@@ -55,6 +55,104 @@ function createWindow() {
 
   mainWindow.loadFile('index.html');
 
+  let paletteWindow = new BrowserWindow({
+    width: 600,
+    height: 450,
+    parent: mainWindow,
+    frame: false,
+    transparent: true,
+    show: false,
+    skipTaskbar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-palette.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  paletteWindow.loadFile('palette.html');
+  paletteWindow.on('blur', () => paletteWindow.hide());
+
+  function showPalette() {
+    const tabData = Array.from(tabs.values()).map(t => ({ id: t.id, title: t.title }));
+    paletteWindow.webContents.send('palette-data', {
+      tabs: tabData,
+      bookmarks,
+      history
+    });
+    const bounds = mainWindow.getBounds();
+    paletteWindow.setBounds({
+      x: bounds.x + Math.floor((bounds.width - 600) / 2),
+      y: bounds.y + Math.floor(bounds.height * 0.15),
+      width: 600,
+      height: 450
+    });
+    paletteWindow.show();
+    paletteWindow.focus();
+  }
+
+  let syncWindow = new BrowserWindow({
+    width: 350,
+    height: 380,
+    parent: mainWindow,
+    frame: false,
+    transparent: true,
+    show: false,
+    skipTaskbar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-sync.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  syncWindow.loadFile('sync.html');
+  syncWindow.on('blur', () => syncWindow.hide());
+
+  function showSync() {
+    const bounds = mainWindow.getBounds();
+    syncWindow.setBounds({
+      x: bounds.x + 250, // Sidebar width
+      y: bounds.y + 100,
+      width: 350,
+      height: 380
+    });
+    syncWindow.show();
+    syncWindow.focus();
+  }
+
+  ipcMain.on('open-sync', () => showSync());
+  ipcMain.on('close-sync', () => syncWindow.hide());
+
+  ipcMain.on('open-palette', () => showPalette());
+  ipcMain.on('close-palette', () => paletteWindow.hide());
+  ipcMain.on('palette-action', (event, action) => {
+    paletteWindow.hide();
+    if (action.type === 'switch-tab') {
+      switchTab(action.id);
+    } else if (action.type === 'navigate') {
+      let finalUrl = action.url.trim();
+      if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+        if (finalUrl.includes('.') && !finalUrl.includes(' ')) {
+          finalUrl = `https://${finalUrl}`;
+        } else {
+          finalUrl = `https://www.google.com/search?q=${encodeURIComponent(finalUrl)}`;
+        }
+      }
+      const wc = getActiveWebContents();
+      if (wc) wc.loadURL(finalUrl);
+    }
+  });
+
+  function setupGlobalShortcuts(wc) {
+    wc.on('before-input-event', (event, input) => {
+      if ((input.control || input.meta) && input.key.toLowerCase() === 'k' && input.type === 'keyDown') {
+        event.preventDefault();
+        showPalette();
+      }
+    });
+  }
+  
+  setupGlobalShortcuts(mainWindow.webContents);
+
   const updateViewBounds = () => {
     if (!activeTabId || !tabs.has(activeTabId)) return;
     const bounds = mainWindow.getContentBounds();
@@ -154,6 +252,7 @@ function createWindow() {
   function createTab(url = 'https://www.google.com') {
     const id = `tab-${tabIdCounter++}`;
     const view = new WebContentsView();
+    setupGlobalShortcuts(view.webContents);
     
     tabs.set(id, { id, view, splitView: null, activePane: 'main', url, splitUrl: '', title: 'New Tab' });
     setupViewListeners(view, id, 'main');
@@ -219,6 +318,7 @@ function createWindow() {
     } else {
       // Add split view
       tab.splitView = new WebContentsView();
+      setupGlobalShortcuts(tab.splitView.webContents);
       tab.splitUrl = 'https://www.google.com';
       setupViewListeners(tab.splitView, id, 'split');
       tab.splitView.webContents.loadURL(tab.splitUrl);
@@ -306,6 +406,72 @@ function createWindow() {
     bookmarks.splice(index, 1);
     saveData();
     return bookmarks;
+  });
+
+  // Sync
+  ipcMain.handle('auth-register', async (event, { username, password }) => {
+    try {
+      const res = await fetch('http://localhost:3000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      return { success: true, message: data.message };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('auth-login', async (event, { username, password }) => {
+    try {
+      const res = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      return { success: true, token: data.token, username: data.username };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('sync-push', async (event, token) => {
+    try {
+      const res = await fetch('http://localhost:3000/api/sync/data', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ bookmarks, history })
+      });
+      if (!res.ok) throw new Error('Failed to push sync');
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('sync-pull', async (event, token) => {
+    try {
+      const res = await fetch('http://localhost:3000/api/sync/data', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      bookmarks = data.bookmarks || [];
+      history = data.history || [];
+      saveData();
+      mainWindow.webContents.send('sync-pulled', { bookmarks, history });
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
   });
 }
 

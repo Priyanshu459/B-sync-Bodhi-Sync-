@@ -32,6 +32,7 @@
   <!-- Sidebar (Left) -->
   <div class="sidebar">
     <button id="btn-new-tab" class="new-tab-btn"><i class="ph ph-plus"></i> New Tab</button>
+    <button id="btn-sync" class="new-tab-btn" style="margin-top: -10px; background: rgba(0,255,100,0.1); border-color: rgba(0,255,100,0.2);"><i class="ph ph-cloud"></i> Bodhi Sync</button>
     <div class="tabs-header" style="font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; margin-left: 5px;">Open Tabs</div>
     <div id="tabs-container"></div>
     
@@ -41,6 +42,14 @@
         <button id="tab-history" class="lib-tab">History</button>
       </div>
       <div id="library-list" class="sidebar-lib-list"></div>
+    </div>
+  </div>
+
+  <!-- Command Palette Overlay -->
+  <div id="command-palette-overlay" class="hidden">
+    <div id="command-palette">
+      <input type="text" id="palette-input" placeholder="Search tabs, bookmarks, history, or web..." autocomplete="off" spellcheck="false">
+      <div id="palette-results"></div>
     </div>
   </div>
 

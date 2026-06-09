@@ -21,10 +21,20 @@ contextBridge.exposeInMainWorld('api', {
   onTabUpdated: (callback) => ipcRenderer.on('tab-updated', (_event, tab) => callback(tab)),
   onTabClosed: (callback) => ipcRenderer.on('tab-closed', (_event, id) => callback(id)),
 
+  openPalette: () => ipcRenderer.send('open-palette'),
+  openSync: () => ipcRenderer.send('open-sync'),
+
   // Library
   getData: () => ipcRenderer.invoke('get-data'),
   toggleBookmark: (url, title) => ipcRenderer.invoke('toggle-bookmark', { url, title }),
   clearHistory: () => ipcRenderer.invoke('clear-history'),
   deleteHistoryItem: (index) => ipcRenderer.invoke('delete-history-item', index),
-  deleteBookmark: (index) => ipcRenderer.invoke('delete-bookmark', index)
+  deleteBookmark: (index) => ipcRenderer.invoke('delete-bookmark', index),
+
+  // Sync
+  authRegister: (username, password) => ipcRenderer.invoke('auth-register', { username, password }),
+  authLogin: (username, password) => ipcRenderer.invoke('auth-login', { username, password }),
+  syncPush: (token) => ipcRenderer.invoke('sync-push', token),
+  syncPull: (token) => ipcRenderer.invoke('sync-pull', token),
+  onSyncPulled: (callback) => ipcRenderer.on('sync-pulled', (_event, data) => callback(data))
 });

@@ -216,3 +216,24 @@ function renderLibrary() {
     libraryList.appendChild(itemEl);
   });
 }
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    window.api.openPalette();
+  }
+});
+
+// Sync Logic
+const btnSync = document.getElementById('btn-sync');
+
+btnSync.addEventListener('click', () => {
+  window.api.openSync();
+});
+
+window.api.onSyncPulled((data) => {
+  if (data.bookmarks) libraryData.bookmarks = data.bookmarks;
+  if (data.history) libraryData.history = data.history;
+  renderLibrary();
+  updateBookmarkStar(addressBar.value);
+});

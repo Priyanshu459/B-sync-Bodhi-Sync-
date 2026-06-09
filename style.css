@@ -349,3 +349,97 @@ body {
 .lib-delete:hover {
   background: rgba(255,0,0,0.5);
 }
+
+/* Command Palette Overlay */
+#command-palette-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 15vh;
+  opacity: 1;
+  transition: opacity 0.2s;
+}
+
+#command-palette-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#command-palette {
+  width: 600px;
+  max-width: 90vw;
+  background: rgba(30, 30, 30, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+}
+
+#palette-input {
+  width: 100%;
+  padding: 15px 20px;
+  font-size: 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+}
+
+#palette-results {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.palette-item {
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+}
+
+.palette-item.selected {
+  background: rgba(255, 255, 255, 0.1);
+  border-left-color: #ffb703;
+}
+
+.palette-item-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-item-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-item-type {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #ffb703;
+  margin-top: 4px;
+  letter-spacing: 1px;
+}
