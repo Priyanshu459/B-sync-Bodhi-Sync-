@@ -27,7 +27,8 @@ let settings = {
   sidebarPos: 'left',
   compactMode: false,
   urlBarPos: 'top',
-  mods: { roundedTabs: false, hideNav: false, hideLib: false }
+  mods: { roundedTabs: false, hideNav: false, hideLib: false },
+  isFirstRun: true
 };
 let bookmarksPath = '';
 let historyPath = '';
@@ -111,6 +112,8 @@ function getWindowState(win) {
       activeTabId: null,
       paletteWindow: null,
       syncWindow: null,
+      downloadsWindow: null,
+      welcomeWindow: null,
       win: win,
       sidebarHovered: false
     });
@@ -442,12 +445,26 @@ function createBrowserWindow(isIncognito = false) {
   state.downloadsWindow.loadFile(path.join(__dirname, 'downloads.html'));
   state.downloadsWindow.on('blur', () => state.downloadsWindow.hide());
 
+  state.welcomeWindow = new BrowserWindow({
+    width: 800, height: 600, parent: win, modal: true, frame: false, transparent: true, show: false, skipTaskbar: true,
+    webPreferences: { preload: path.join(__dirname, 'preload-welcome.js'), contextIsolation: true, nodeIntegration: false }
+  });
+  state.welcomeWindow.loadFile(path.join(__dirname, 'welcome.html'));
+
   win.on('resize', () => updateViewBounds(win));
   win.on('maximize', () => updateViewBounds(win));
   win.on('unmaximize', () => updateViewBounds(win));
   
   win.once('ready-to-show', () => {
     win.show();
+    if (!isIncognito && settings.isFirstRun) {
+      setTimeout(() => {
+        state.welcomeWindow.show();
+        state.welcomeWindow.focus();
+        settings.isFirstRun = false;
+        saveData();
+      }, 500);
+    }
     createTab(getHomepageUrl(), win);
   });
 
@@ -525,6 +542,15 @@ ipcMain.on('window-maximize', (event) => {
 ipcMain.on('window-close', (event) => {
   const win = getMainWindowFromEvent(event);
   if (win) win.close();
+});
+
+ipcMain.on('close-welcome', (event) => {
+  const win = getMainWindowFromEvent(event);
+  if (!win) return;
+  const state = getWindowState(win);
+  if (state && state.welcomeWindow) {
+    state.welcomeWindow.hide();
+  }
 });
 
 ipcMain.on('log-error', (event, msg) => {
