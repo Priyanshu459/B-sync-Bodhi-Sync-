@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>B-sync</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+  <!-- Titlebar (Top) -->
+  <div class="titlebar">
+    <div class="nav-controls">
+      <button id="btn-back" class="nav-btn" title="Go back"><i class="ph ph-caret-left"></i></button>
+      <button id="btn-forward" class="nav-btn" title="Go forward"><i class="ph ph-caret-right"></i></button>
+      <button id="btn-reload" class="nav-btn" title="Reload"><i class="ph ph-arrow-clockwise"></i></button>
+      <button id="btn-split" class="nav-btn" title="Split View"><i class="ph ph-columns"></i></button>
+    </div>
+    
+    <div class="address-bar-container">
+      <input type="text" id="address-bar" placeholder="Search or enter address" autocomplete="off" spellcheck="false">
+      <button id="btn-bookmark" class="icon-btn inside-input" title="Bookmark"><i class="ph ph-star"></i></button>
+    </div>
+
+    <div class="window-controls">
+      <button id="btn-minimize" class="win-btn" title="Minimize"><i class="ph ph-minus"></i></button>
+      <button id="btn-maximize" class="win-btn" title="Maximize"><i class="ph ph-square"></i></button>
+      <button id="btn-close" class="win-btn close" title="Close"><i class="ph ph-x"></i></button>
+    </div>
+  </div>
+
+  <!-- Sidebar (Left) -->
+  <div class="sidebar">
+    <button id="btn-new-tab" class="new-tab-btn"><i class="ph ph-plus"></i> New Tab</button>
+    <div class="tabs-header" style="font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; margin-left: 5px;">Open Tabs</div>
+    <div id="tabs-container"></div>
+    
+    <div class="sidebar-library">
+      <div class="sidebar-lib-tabs">
+        <button id="tab-bookmarks" class="lib-tab active">Bookmarks</button>
+        <button id="tab-history" class="lib-tab">History</button>
+      </div>
+      <div id="library-list" class="sidebar-lib-list"></div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

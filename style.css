@@ -1,0 +1,351 @@
+:root {
+  /* Fully transparent so acrylic shows 100% */
+  --bg-color: rgba(0, 0, 0, 0); 
+  --hover-color: rgba(255, 255, 255, 0.15);
+  --border-color: rgba(255, 255, 255, 0.05);
+  --text-color: rgba(255, 255, 255, 0.9);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  /* Crucial: transparent background so Mica/Acrylic shows through */
+  background-color: transparent; 
+  color: var(--text-color);
+  overflow: hidden;
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  background-color: var(--bg-color);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 10px;
+  position: relative;
+  /* We add a subtle inner shadow to enhance the glass look */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  -webkit-app-region: drag;
+}
+
+.nav-controls, .address-bar-container, .window-controls {
+  position: relative;
+  z-index: 2; /* Keep above drag region so they are clickable */
+  display: flex;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
+.nav-controls {
+  gap: 5px;
+  margin-right: 15px;
+}
+
+.nav-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  font-size: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+  /* Add text shadow so the icon is visible even if the background is light */
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+
+.nav-btn:hover {
+  background: var(--hover-color);
+}
+
+.address-bar-container {
+  flex-grow: 1;
+  max-width: 600px;
+  margin: 0 auto;
+  position: relative;
+}
+
+#address-bar {
+  width: 100%;
+  padding: 10px 40px 10px 20px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  background-color: rgba(0, 0, 0, 0.2);
+  color: var(--text-color);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.3s ease;
+  /* Add subtle shadow inside */
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+}
+
+#address-bar:focus {
+  background-color: rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1), inset 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.icon-btn.inside-input {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  font-size: 18px;
+  cursor: pointer;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.icon-btn.inside-input:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.icon-btn.active {
+  color: #ffb703; /* Gold star */
+}
+
+.window-controls {
+  gap: 5px;
+  margin-left: 15px;
+}
+
+.win-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  width: 40px;
+  height: 32px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  font-size: 14px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+
+.win-btn:hover {
+  background: var(--hover-color);
+}
+
+.win-btn.close:hover {
+  background: #e81123; /* Windows standard red for close */
+  color: white;
+}
+
+/* Sidebar Styles */
+.sidebar {
+  position: absolute;
+  top: 60px; /* Below titlebar */
+  left: 0;
+  bottom: 0;
+  width: 240px;
+  background-color: rgba(0, 0, 0, 0.1); /* Very subtle tint */
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  -webkit-app-region: no-drag;
+}
+
+.new-tab-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+  margin-bottom: 15px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.new-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+#tabs-container {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-color);
+  transition: background 0.2s;
+  font-size: 13px;
+}
+
+.tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tab.active {
+  background: rgba(255, 255, 255, 0.15);
+  font-weight: 500;
+}
+
+.tab-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.tab-close {
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 4px;
+  display: flex;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.tab:hover .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.sidebar-library {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  border-top: 1px solid var(--border-color);
+  margin-top: 10px;
+  padding-top: 10px;
+  overflow: hidden;
+}
+
+.sidebar-lib-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 0 5px;
+}
+
+.lib-tab {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 5px 8px;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.lib-tab:hover {
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.8);
+}
+
+.lib-tab.active {
+  color: white;
+  background: rgba(255,255,255,0.1);
+}
+
+.sidebar-lib-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+.library-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.library-item:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.lib-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-grow: 1;
+}
+
+.lib-title {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lib-url {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lib-delete {
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  opacity: 0;
+  padding: 5px;
+  border-radius: 4px;
+}
+
+.library-item:hover .lib-delete {
+  opacity: 1;
+}
+
+.lib-delete:hover {
+  background: rgba(255,0,0,0.5);
+}
