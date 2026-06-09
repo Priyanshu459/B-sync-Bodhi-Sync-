@@ -1,3 +1,9 @@
+window.onerror = function(message, source, lineno, colno, error) {
+  if (window.api && window.api.logError) {
+    window.api.logError(message + ' at ' + source + ':' + lineno);
+  }
+};
+
 const addressBar = document.getElementById('address-bar');
 const btnBack = document.getElementById('btn-back');
 const btnForward = document.getElementById('btn-forward');
@@ -22,6 +28,43 @@ let tabs = new Map();
 let activeTabId = null;
 let currentLibraryTab = 'bookmarks';
 let libraryData = { bookmarks: [], history: [] };
+
+const sidebarEl = document.querySelector('.sidebar');
+const titlebarEl = document.querySelector('.titlebar');
+const addressBarContainer = document.querySelector('.address-bar-container');
+
+function applyZenSettings(settings) {
+  if (settings.themeColors) {
+    document.documentElement.style.setProperty('--bg-main', settings.themeColors.bgMain);
+    document.documentElement.style.setProperty('--bg-dark', settings.themeColors.bgDark);
+    document.documentElement.style.setProperty('--accent-color', settings.themeColors.accent);
+  }
+  if (settings.sidebarPos === 'right') document.body.classList.add('sidebar-right');
+  else document.body.classList.remove('sidebar-right');
+  
+  if (settings.urlBarPos === 'sidebar') {
+    document.body.classList.add('url-in-sidebar');
+    sidebarEl.insertBefore(addressBarContainer, sidebarEl.firstChild);
+  } else {
+    document.body.classList.remove('url-in-sidebar');
+    if (addressBarContainer.parentElement !== titlebarEl) {
+      titlebarEl.insertBefore(addressBarContainer, titlebarEl.children[1]);
+    }
+  }
+  
+  if (settings.compactMode) document.body.classList.add('compact-mode');
+  else document.body.classList.remove('compact-mode');
+  
+  if (settings.mods) {
+    if (settings.mods.roundedTabs) document.body.classList.add('mod-rounded-tabs'); else document.body.classList.remove('mod-rounded-tabs');
+    if (settings.mods.hideNav) document.body.classList.add('mod-hide-nav'); else document.body.classList.remove('mod-hide-nav');
+    if (settings.mods.hideLib) document.body.classList.add('mod-hide-lib'); else document.body.classList.remove('mod-hide-lib');
+  }
+}
+
+window.api.getSettings().then(settings => {
+  applyZenSettings(settings);
+});
 
 // Initial Load
 window.api.getData().then(data => {
@@ -305,68 +348,9 @@ window.api.onSyncPulled((data) => {
 
 // Downloads Logic
 const btnDownloads = document.getElementById('btn-downloads');
-const downloadsPanel = document.getElementById('downloads-panel');
-const downloadsList = document.getElementById('downloads-list');
-let downloads = new Map();
 
 btnDownloads.addEventListener('click', () => {
-  downloadsPanel.classList.toggle('hidden');
-});
-
-function renderDownloads() {
-  downloadsList.innerHTML = '';
-  downloads.forEach((dl, id) => {
-    const el = document.createElement('div');
-    el.className = 'download-item';
-    
-    const pct = dl.totalBytes ? Math.round((dl.receivedBytes / dl.totalBytes) * 100) : 0;
-    
-    let statusText = dl.state === 'progressing' ? `${pct}%` : dl.state;
-    if (dl.state === 'completed') statusText = 'Done';
-    
-    el.innerHTML = `
-      <div class="dl-filename">${dl.filename}</div>
-      <div class="dl-progress-bar">
-        <div class="dl-progress-fill" style="width: ${dl.state === 'completed' ? 100 : pct}%; background: ${dl.state === 'interrupted' ? '#ff4d4d' : '#00ff64'}"></div>
-      </div>
-      <div class="dl-status">
-        <span>${(dl.receivedBytes / 1024 / 1024).toFixed(1)} MB / ${(dl.totalBytes / 1024 / 1024).toFixed(1)} MB</span>
-        <span style="color: ${dl.state === 'completed' ? '#00ff64' : 'inherit'}">${statusText}</span>
-      </div>
-    `;
-    downloadsList.appendChild(el);
-  });
-}
-
-window.api.onDownloadStarted((info) => {
-  downloadsPanel.classList.remove('hidden');
-  downloads.set(info.filename, { ...info, receivedBytes: 0 });
-  renderDownloads();
-});
-
-window.api.onDownloadProgress((info) => {
-  if (downloads.has(info.filename)) {
-    const dl = downloads.get(info.filename);
-    dl.receivedBytes = info.receivedBytes;
-    dl.totalBytes = info.totalBytes;
-    dl.state = 'progressing';
-    renderDownloads();
-  }
-});
-
-window.api.onDownloadDone((info) => {
-  if (downloads.has(info.filename)) {
-    const dl = downloads.get(info.filename);
-    dl.state = info.state;
-    renderDownloads();
-  }
-});
-
-window.api.onDownloadInterrupted((filename) => {
-  if (downloads.has(filename)) {
-    downloads.get(filename).state = 'interrupted';
-    renderDownloads();
-  }
+  window.api.openDownloads();
 });
 
 // Settings Logic
@@ -374,13 +358,66 @@ const btnSettings = document.getElementById('btn-settings');
 const settingsOverlay = document.getElementById('settings-overlay');
 const btnCloseSettings = document.getElementById('btn-close-settings');
 const searchEngineSelect = document.getElementById('search-engine-select');
-
 const btnSaveSettings = document.getElementById('btn-save-settings');
+
+const sidebarPosSelect = document.getElementById('sidebar-pos-select');
+const urlPosSelect = document.getElementById('url-pos-select');
+const compactModeCheck = document.getElementById('compact-mode-check');
+const modRoundedTabs = document.getElementById('mod-rounded-tabs');
+const modHideNav = document.getElementById('mod-hide-nav');
+const modHideLib = document.getElementById('mod-hide-lib');
+
+const themeEditorOverlay = document.getElementById('theme-editor-overlay');
+const btnCloseTheme = document.getElementById('btn-close-theme');
+const btnSaveTheme = document.getElementById('btn-save-theme');
+const themeBgMain = document.getElementById('theme-bg-main');
+const themeBgDark = document.getElementById('theme-bg-dark');
+const themeAccent = document.getElementById('theme-accent');
+
+sidebarEl.addEventListener('mouseenter', () => {
+  if (document.body.classList.contains('compact-mode')) window.api.sidebarHover(true);
+});
+sidebarEl.addEventListener('mouseleave', () => {
+  if (document.body.classList.contains('compact-mode')) window.api.sidebarHover(false);
+});
+
+sidebarEl.addEventListener('contextmenu', async (e) => {
+  e.preventDefault();
+  const settings = await window.api.getSettings();
+  const colors = settings.themeColors || { bgMain: 'rgba(30, 30, 30, 0.85)', bgDark: 'rgba(15, 15, 15, 0.85)', accent: '#3b82f6' };
+  themeBgMain.value = colors.bgMain;
+  themeBgDark.value = colors.bgDark;
+  themeAccent.value = colors.accent;
+  
+  themeEditorOverlay.classList.remove('hidden');
+  window.api.modalOpened();
+});
+
+btnCloseTheme.addEventListener('click', () => {
+  themeEditorOverlay.classList.add('hidden');
+  window.api.modalClosed();
+});
+
+btnSaveTheme.addEventListener('click', async () => {
+  const colors = { bgMain: themeBgMain.value, bgDark: themeBgDark.value, accent: themeAccent.value };
+  const settings = await window.api.updateSetting('themeColors', colors);
+  applyZenSettings(settings);
+  themeEditorOverlay.classList.add('hidden');
+  window.api.modalClosed();
+});
 
 btnSettings.addEventListener('click', async () => {
   window.api.modalOpened();
   const settings = await window.api.getSettings();
   searchEngineSelect.value = settings.searchEngine || 'google';
+  sidebarPosSelect.value = settings.sidebarPos || 'left';
+  urlPosSelect.value = settings.urlBarPos || 'top';
+  compactModeCheck.checked = settings.compactMode || false;
+  if (settings.mods) {
+    modRoundedTabs.checked = settings.mods.roundedTabs || false;
+    modHideNav.checked = settings.mods.hideNav || false;
+    modHideLib.checked = settings.mods.hideLib || false;
+  }
   settingsOverlay.classList.remove('hidden');
 });
 
@@ -393,6 +430,31 @@ btnSaveSettings.addEventListener('click', async () => {
   await window.api.updateSetting('searchEngine', searchEngineSelect.value);
   settingsOverlay.classList.add('hidden');
   window.api.modalClosed();
+});
+
+[sidebarPosSelect, urlPosSelect].forEach(el => {
+  el.addEventListener('change', async () => {
+    const key = el.id === 'sidebar-pos-select' ? 'sidebarPos' : 'urlBarPos';
+    const settings = await window.api.updateSetting(key, el.value);
+    applyZenSettings(settings);
+  });
+});
+
+compactModeCheck.addEventListener('change', async () => {
+  const settings = await window.api.updateSetting('compactMode', compactModeCheck.checked);
+  applyZenSettings(settings);
+});
+
+[modRoundedTabs, modHideNav, modHideLib].forEach(el => {
+  el.addEventListener('change', async () => {
+    const settings = await window.api.getSettings();
+    settings.mods = settings.mods || {};
+    if (el.id === 'mod-rounded-tabs') settings.mods.roundedTabs = el.checked;
+    if (el.id === 'mod-hide-nav') settings.mods.hideNav = el.checked;
+    if (el.id === 'mod-hide-lib') settings.mods.hideLib = el.checked;
+    const newSet = await window.api.updateSetting('mods', settings.mods);
+    applyZenSettings(newSet);
+  });
 });
 
 searchEngineSelect.addEventListener('change', async (e) => {
@@ -458,26 +520,43 @@ function renderVault() {
   decryptedVault.forEach((item, index) => {
     const el = document.createElement('div');
     el.className = 'vault-pwd-item';
-    el.innerHTML = `
-      <div>
-        <strong>${item.site}</strong><br>
-        <small>${item.username}</small>
-      </div>
-      <div class="pwd-actions">
-        <button onclick="navigator.clipboard.writeText('${item.password}')" title="Copy Password"><i class="ph ph-copy"></i></button>
-        <button class="del-pwd" data-index="${index}" title="Delete"><i class="ph ph-trash"></i></button>
-      </div>
-    `;
-    vaultList.appendChild(el);
-  });
-  
-  document.querySelectorAll('.del-pwd').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const index = e.currentTarget.getAttribute('data-index');
+    const textContainer = document.createElement('div');
+    const siteStrong = document.createElement('strong');
+    siteStrong.textContent = item.site;
+    const br = document.createElement('br');
+    const userSmall = document.createElement('small');
+    userSmall.textContent = item.username;
+    textContainer.appendChild(siteStrong);
+    textContainer.appendChild(br);
+    textContainer.appendChild(userSmall);
+
+    const actionsContainer = document.createElement('div');
+    actionsContainer.className = 'pwd-actions';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.title = 'Copy Password';
+    copyBtn.innerHTML = '<i class="ph ph-copy"></i>';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(item.password);
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'del-pwd';
+    delBtn.title = 'Delete';
+    delBtn.innerHTML = '<i class="ph ph-trash"></i>';
+    delBtn.addEventListener('click', async () => {
       decryptedVault.splice(index, 1);
       await window.api.vaultSave(decryptedVault, currentMasterPassword);
       renderVault();
     });
+
+    actionsContainer.appendChild(copyBtn);
+    actionsContainer.appendChild(delBtn);
+
+    el.appendChild(textContainer);
+    el.appendChild(actionsContainer);
+
+    vaultList.appendChild(el);
   });
 }
 

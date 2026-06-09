@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Downloads</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https: data:;">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <style>
+    body {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      color: white;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .downloads-header {
+      padding: 10px 15px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255,255,255,0.02);
+      -webkit-app-region: drag;
+    }
+    #downloads-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+    }
+    .download-item {
+      padding: 10px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+    .dl-filename {
+      font-size: 13px;
+      margin-bottom: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dl-progress-bar {
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .dl-progress-fill {
+      height: 100%;
+      background: var(--accent-color);
+      transition: width 0.3s;
+    }
+    .dl-status {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: rgba(255,255,255,0.5);
+    }
+    .empty-state {
+      text-align: center;
+      padding: 30px 10px;
+      color: rgba(255,255,255,0.4);
+      font-size: 13px;
+    }
+    .empty-state i {
+      font-size: 32px;
+      margin-bottom: 10px;
+      opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="downloads-header">
+    <span>Downloads</span>
+  </div>
+  <div id="downloads-list">
+    <div class="empty-state">
+      <i class="ph ph-download-simple"></i><br>
+      No recent downloads
+    </div>
+  </div>
+  <script src="downloads.js"></script>
+</body>
+</html>

@@ -5,14 +5,8 @@
   <title>B-sync</title>
   <link rel="stylesheet" href="style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https: data:;">
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <script>
-    window.onerror = function(message, source, lineno, colno, error) {
-      if (window.api && window.api.logError) {
-        window.api.logError(message + ' at ' + source + ':' + lineno);
-      }
-    };
-  </script>
 </head>
 <body>
   <!-- Titlebar (Top) -->
@@ -28,11 +22,6 @@
       <input type="text" id="address-bar" placeholder="Search or enter address" autocomplete="off" spellcheck="false">
       <button id="btn-bookmark" class="icon-btn inside-input" title="Bookmark"><i class="ph ph-star"></i></button>
       <button id="btn-downloads" class="icon-btn inside-input" style="right: 35px;" title="Downloads"><i class="ph ph-download-simple"></i></button>
-    </div>
-
-    <div id="downloads-panel" class="hidden">
-      <div class="downloads-header">Downloads</div>
-      <div id="downloads-list"></div>
     </div>
 
     <div class="window-controls">
@@ -83,6 +72,36 @@
           <option value="brave" style="background: var(--bg-main); color: white;">Brave Search</option>
           <option value="duckduckgo" style="background: var(--bg-main); color: white;">DuckDuckGo</option>
         </select>
+        
+        <hr style="border: 0; border-top: 1px solid var(--border-light); margin: 15px 0;">
+        <h3 style="color: white; margin-bottom: 10px; font-size: 14px;">Zen Customization</h3>
+        
+        <label for="sidebar-pos-select" style="display: block; margin-bottom: 8px; color: rgba(255,255,255,0.8);">Sidebar Position:</label>
+        <select id="sidebar-pos-select" style="width: 100%; padding: 10px; background: var(--bg-main); border: 1px solid var(--border-light); color: white; border-radius: 4px; margin-bottom: 15px;">
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+        </select>
+        
+        <label for="url-pos-select" style="display: block; margin-bottom: 8px; color: rgba(255,255,255,0.8);">URL Bar Position:</label>
+        <select id="url-pos-select" style="width: 100%; padding: 10px; background: var(--bg-main); border: 1px solid var(--border-light); color: white; border-radius: 4px; margin-bottom: 15px;">
+          <option value="top">Top Bar</option>
+          <option value="sidebar">Inside Sidebar</option>
+        </select>
+        
+        <label style="display: flex; align-items: center; margin-bottom: 15px; color: white;">
+          <input type="checkbox" id="compact-mode-check" style="margin-right: 10px;"> Enable Compact Sidebar
+        </label>
+        
+        <h3 style="color: white; margin-bottom: 10px; font-size: 14px;">Zen Mods</h3>
+        <label style="display: flex; align-items: center; margin-bottom: 8px; color: rgba(255,255,255,0.8);">
+          <input type="checkbox" id="mod-rounded-tabs" style="margin-right: 10px;"> Pill-Rounded Tabs
+        </label>
+        <label style="display: flex; align-items: center; margin-bottom: 8px; color: rgba(255,255,255,0.8);">
+          <input type="checkbox" id="mod-hide-nav" style="margin-right: 10px;"> Hide Nav Controls
+        </label>
+        <label style="display: flex; align-items: center; margin-bottom: 20px; color: rgba(255,255,255,0.8);">
+          <input type="checkbox" id="mod-hide-lib" style="margin-right: 10px;"> Hide Library Tabs
+        </label>
         <button id="btn-save-settings" class="btn-primary" style="width: 100%;">Save Changes</button>
       </div>
     </div>
@@ -111,6 +130,31 @@
           <button id="btn-add-pwd" class="btn-primary">Add</button>
         </div>
         <div id="vault-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Theme Editor Overlay -->
+  <div id="theme-editor-overlay" class="hidden">
+    <div id="theme-editor-modal" style="background: var(--bg-dark); border: 1px solid var(--border-light); padding: 20px; border-radius: 8px; width: 300px; position: absolute; left: 260px; top: 100px;">
+      <div class="vault-header">
+        <h2><i class="ph ph-palette"></i> Theme Editor</h2>
+        <button id="btn-close-theme" class="icon-btn"><i class="ph ph-x"></i></button>
+      </div>
+      <div style="margin-top: 20px;">
+        <label style="display: block; margin-bottom: 15px; color: white;">
+          Primary Background (RGBA)
+          <input type="text" id="theme-bg-main" style="width: 100%; margin-top: 5px; padding: 5px; background: var(--bg-main); border: 1px solid var(--border-light); color: white;">
+        </label>
+        <label style="display: block; margin-bottom: 15px; color: white;">
+          Secondary Background (RGBA)
+          <input type="text" id="theme-bg-dark" style="width: 100%; margin-top: 5px; padding: 5px; background: var(--bg-main); border: 1px solid var(--border-light); color: white;">
+        </label>
+        <label style="display: block; margin-bottom: 20px; color: white;">
+          Accent Color (HEX/RGB)
+          <input type="text" id="theme-accent" style="width: 100%; margin-top: 5px; padding: 5px; background: var(--bg-main); border: 1px solid var(--border-light); color: white;">
+        </label>
+        <button id="btn-save-theme" class="btn-primary" style="width: 100%;">Apply Theme</button>
       </div>
     </div>
   </div>

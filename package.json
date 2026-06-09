@@ -1,6 +1,6 @@
 {
   "name": "b-sync",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Bodhi Sync Browser",
   "main": "index.js",
   "scripts": {
@@ -28,7 +28,7 @@
     }
   },
   "dependencies": {
-    "adblock-rs": "^0.12.5",
+    "@ghostery/adblocker-electron": "^2.18.0",
     "cross-fetch": "^4.0.0",
     "electron-updater": "^6.1.8"
   },

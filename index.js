@@ -1,5 +1,4 @@
 const { app, BrowserWindow, WebContentsView, ipcMain, session } = require('electron');
-const { adblock } = require('adblock-rs');
 const { autoUpdater } = require('electron-updater');
 const fetch = require('cross-fetch');
 const path = require('path');
@@ -9,6 +8,8 @@ const crypto = require('crypto');
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('no-sandbox');
 app.commandLine.appendSwitch('disable-gpu-sandbox');
+
+
 
 process.on('uncaughtException', (error) => {
   fs.writeFileSync(path.join(app.getPath('userData'), 'b-sync-crash.log'), error.stack || error.toString());
@@ -20,7 +21,14 @@ process.on('unhandledRejection', (reason) => {
 let bookmarks = [];
 let history = [];
 let vault = [];
-let settings = { searchEngine: 'google' };
+let settings = { 
+  searchEngine: 'google',
+  themeColors: { bgMain: 'rgba(30, 30, 30, 0.85)', bgDark: 'rgba(15, 15, 15, 0.85)', accent: '#3b82f6' },
+  sidebarPos: 'left',
+  compactMode: false,
+  urlBarPos: 'top',
+  mods: { roundedTabs: false, hideNav: false, hideLib: false }
+};
 let bookmarksPath = '';
 let historyPath = '';
 let vaultPath = '';
@@ -61,10 +69,10 @@ function loadData() {
   try { if (fs.existsSync(settingsPath)) settings = Object.assign(settings, JSON.parse(fs.readFileSync(settingsPath, 'utf8'))); } catch(e){}
 }
 function saveData() {
-  fs.writeFileSync(bookmarksPath, JSON.stringify(bookmarks));
-  fs.writeFileSync(historyPath, JSON.stringify(history));
-  fs.writeFileSync(vaultPath, JSON.stringify(vault));
-  fs.writeFileSync(settingsPath, JSON.stringify(settings));
+  fs.writeFile(bookmarksPath, JSON.stringify(bookmarks), () => {});
+  fs.writeFile(historyPath, JSON.stringify(history), () => {});
+  fs.writeFile(vaultPath, JSON.stringify(vault), () => {});
+  fs.writeFile(settingsPath, JSON.stringify(settings), () => {});
 }
 
 function getSearchUrl(query) {
@@ -103,7 +111,8 @@ function getWindowState(win) {
       activeTabId: null,
       paletteWindow: null,
       syncWindow: null,
-      win: win
+      win: win,
+      sidebarHovered: false
     });
   }
   return windowStates.get(win.id);
@@ -132,25 +141,30 @@ const updateViewBounds = (win) => {
   const bounds = win.getContentBounds();
   const tab = state.tabs.get(state.activeTabId);
   
+  const effSidebarWidth = (settings.compactMode && !state.sidebarHovered) ? 60 : SIDEBAR_WIDTH;
+  const isRight = settings.sidebarPos === 'right';
+  const viewX = isRight ? 0 : effSidebarWidth;
+  const effWidth = bounds.width - effSidebarWidth;
+  
   if (!tab.splitView) {
     tab.view.setBounds({ 
-      x: SIDEBAR_WIDTH, 
+      x: viewX, 
       y: TITLEBAR_HEIGHT, 
-      width: bounds.width - SIDEBAR_WIDTH, 
+      width: effWidth, 
       height: bounds.height - TITLEBAR_HEIGHT 
     });
   } else {
-    const halfWidth = Math.floor((bounds.width - SIDEBAR_WIDTH) / 2);
+    const halfWidth = Math.floor(effWidth / 2);
     tab.view.setBounds({ 
-      x: SIDEBAR_WIDTH, 
+      x: viewX, 
       y: TITLEBAR_HEIGHT, 
       width: halfWidth, 
       height: bounds.height - TITLEBAR_HEIGHT 
     });
     tab.splitView.setBounds({
-      x: SIDEBAR_WIDTH + halfWidth,
+      x: viewX + halfWidth,
       y: TITLEBAR_HEIGHT,
-      width: bounds.width - SIDEBAR_WIDTH - halfWidth,
+      width: effWidth - halfWidth,
       height: bounds.height - TITLEBAR_HEIGHT
     });
   }
@@ -183,6 +197,18 @@ function setupViewListeners(view, tabId, pane, win) {
         win.webContents.send('url-updated', newUrl);
       }
     }
+  });
+
+  view.webContents.on('dom-ready', () => {
+    view.webContents.insertCSS(`
+      div[class*="promo"],
+      div[class*="download-prompt"],
+      a[href*="brave.com/download"],
+      #b-promo,
+      #download-brave-promo {
+        display: none !important;
+      }
+    `);
   });
   
   if (pane === 'main') {
@@ -225,10 +251,16 @@ function setupViewListeners(view, tabId, pane, win) {
   });
 }
 
-function createTab(url = 'https://www.google.com', win) {
+function createTab(url, win) {
+  if (!url) url = getHomepageUrl();
   const state = getWindowState(win);
   const id = `tab-${tabIdCounter++}`;
-  const view = new WebContentsView();
+  const view = new WebContentsView({
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-tab.js'),
+      contextIsolation: true
+    }
+  });
   setupGlobalShortcuts(view.webContents, win);
   
   state.tabs.set(id, { id, view, splitView: null, activePane: 'main', url, splitUrl: '', title: 'New Tab' });
@@ -271,6 +303,11 @@ function closeTab(id, win) {
     state.activeTabId = null;
   }
   
+  try { tabToClose.view.webContents.close(); } catch(e){}
+  if (tabToClose.splitView) {
+    try { tabToClose.splitView.webContents.close(); } catch(e){}
+  }
+  
   state.tabs.delete(id);
   win.webContents.send('tab-closed', id);
   
@@ -295,9 +332,14 @@ function toggleSplitView(id, win) {
     updateViewBounds(win);
     win.webContents.send('url-updated', tab.url);
   } else {
-    tab.splitView = new WebContentsView();
+    tab.splitView = new WebContentsView({
+      webPreferences: {
+        preload: path.join(__dirname, 'preload-tab.js'),
+        contextIsolation: true
+      }
+    });
     setupGlobalShortcuts(tab.splitView.webContents, win);
-    tab.splitUrl = 'https://www.google.com';
+    tab.splitUrl = getHomepageUrl();
     setupViewListeners(tab.splitView, id, 'split', win);
     tab.splitView.webContents.loadURL(tab.splitUrl);
     
@@ -344,12 +386,29 @@ function showSync(win) {
   state.syncWindow.focus();
 }
 
+function showDownloads(win) {
+  const state = getWindowState(win);
+  if (!state.downloadsWindow) return;
+  const bounds = win.getBounds();
+  state.downloadsWindow.setBounds({
+    x: bounds.x + bounds.width - 360, // 10px padding from right
+    y: bounds.y + 40, // Below titlebar
+    width: 350,
+    height: 400
+  });
+  state.downloadsWindow.show();
+  state.downloadsWindow.focus();
+}
+
 function createBrowserWindow(isIncognito = false) {
   let win = new BrowserWindow({
     width: 1200,
     height: 800,
     frame: false,
-    backgroundColor: isIncognito ? '#0F0F0F' : '#1E1E1E',
+    transparent: true,
+    backgroundMaterial: 'acrylic',
+    vibrancy: 'fullscreen-ui',
+    backgroundColor: '#00000000',
     webPreferences: {
       partition: isIncognito ? 'in-memory' : 'persist:default',
       preload: path.join(__dirname, 'preload.js'),
@@ -376,6 +435,13 @@ function createBrowserWindow(isIncognito = false) {
   state.syncWindow.loadFile(path.join(__dirname, 'sync.html'));
   state.syncWindow.on('blur', () => state.syncWindow.hide());
 
+  state.downloadsWindow = new BrowserWindow({
+    width: 350, height: 400, parent: win, frame: false, backgroundColor: '#1E1E1E', show: false, skipTaskbar: true,
+    webPreferences: { preload: path.join(__dirname, 'preload-downloads.js'), contextIsolation: true, nodeIntegration: false }
+  });
+  state.downloadsWindow.loadFile(path.join(__dirname, 'downloads.html'));
+  state.downloadsWindow.on('blur', () => state.downloadsWindow.hide());
+
   win.on('resize', () => updateViewBounds(win));
   win.on('maximize', () => updateViewBounds(win));
   win.on('unmaximize', () => updateViewBounds(win));
@@ -397,6 +463,16 @@ settingsPath = path.join(app.getPath('userData'), 'settings.json');
 loadData();
 
 // IPC Listeners
+ipcMain.on('sidebar-hover', (event, hovered) => {
+  const win = getMainWindowFromEvent(event);
+  if (!win) return;
+  const state = getWindowState(win);
+  if (state.sidebarHovered !== hovered) {
+    state.sidebarHovered = hovered;
+    updateViewBounds(win);
+  }
+});
+
 ipcMain.on('open-incognito', () => createBrowserWindow(true));
 
 ipcMain.on('window-minimize', (event) => {
@@ -432,6 +508,11 @@ ipcMain.on('modal-closed', (event) => {
       try { win.contentView.addChildView(tab.splitView); } catch(e) {}
     }
   }
+});
+
+ipcMain.on('open-downloads', (event) => {
+  const win = getMainWindowFromEvent(event);
+  if (win) showDownloads(win);
 });
 
 ipcMain.on('window-maximize', (event) => {
@@ -577,6 +658,10 @@ ipcMain.handle('get-settings', () => settings);
 ipcMain.handle('update-setting', (event, { key, value }) => {
   settings[key] = value;
   saveData();
+  const win = getMainWindowFromEvent(event);
+  if (win && ['sidebarPos', 'compactMode'].includes(key)) {
+    updateViewBounds(win);
+  }
   return settings;
 });
 ipcMain.handle('get-data', () => ({ bookmarks, history }));
@@ -694,48 +779,73 @@ ipcMain.handle('vault-save', (event, { dataArray, masterPassword }) => {
 });
 
 app.whenReady().then(async () => {
+  // Dynamically spoof a standard Chrome User-Agent using the current Chromium version
+  const defaultUA = session.defaultSession.getUserAgent();
+  const cleanUA = defaultUA.replace(/b-sync\/[0-9.-]+\s*/, '').replace(/Electron\/[0-9.-]+\s*/, '');
+  app.userAgentFallback = cleanUA;
+  session.defaultSession.setUserAgent(cleanUA);
+  session.fromPartition('in-memory').setUserAgent(cleanUA);
+
+  const setupHeaders = (sess) => {
+    sess.webRequest.onBeforeSendHeaders((details, callback) => {
+      details.requestHeaders['Sec-CH-UA'] = '"Brave";v="123", "Not:A-Brand";v="8", "Chromium";v="123"';
+      details.requestHeaders['Sec-CH-UA-Mobile'] = '?0';
+      details.requestHeaders['Sec-CH-UA-Platform'] = '"Windows"';
+      details.requestHeaders['User-Agent'] = cleanUA;
+      callback({ cancel: false, requestHeaders: details.requestHeaders });
+    });
+  };
+  setupHeaders(session.defaultSession);
+  setupHeaders(session.fromPartition('in-memory'));
+
   async function setupAdblocker() {
     try {
-      const { FilterSet, Engine } = require('adblock-rs');
-      const res = await fetch('https://easylist.to/easylist/easylist.txt');
-      const rules = await res.text();
+      const { ElectronBlocker } = require('@ghostery/adblocker-electron');
       
-      const filterSet = new FilterSet(true);
-      filterSet.addFilters(rules.split('\n'));
-      const engine = new Engine(filterSet, true);
-
-      function attachSessionListeners(sess) {
-        sess.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] }, (details, callback) => {
-          const resourceType = details.resourceType === 'mainFrame' ? 'document' : details.resourceType;
-          const sourceUrl = details.referrer || details.url; 
-          
-          try {
-            if (engine.check(details.url, sourceUrl, resourceType)) {
-              console.log(`[adblock-rs] Blocked: ${details.url}`);
-              return callback({ cancel: true });
-            }
-          } catch (e) {
-            // Ignore parsing errors for unsupported protocols
-          }
-          callback({ cancel: false });
-        });
-
+      const blocker = await ElectronBlocker.fromPrebuiltFull(fetch);
+      
+      try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) {}
+      try { blocker.enableBlockingInSession(session.fromPartition('in-memory')); } catch (e) {}
+      
+      console.log('Ghostery adblocker-electron initialized for all sessions!');
+      
+      function attachDownloadListener(sess) {
         sess.on('will-download', (event, item, webContents) => {
-          const targetWin = BrowserWindow.fromWebContents(webContents);
-          if (!targetWin) return;
-          targetWin.webContents.send('download-started', {
+          const mainState = Array.from(windowStates.values())[0];
+          if (!mainState || !mainState.win) return;
+          const targetWin = mainState.win;
+          const state = getWindowState(targetWin);
+          if (!state || !state.downloadsWindow) return;
+          
+          showDownloads(targetWin);
+          
+          let tabIdToClose = null;
+          for (const [id, tab] of state.tabs) {
+            if ((tab.view && tab.view.webContents === webContents) ||
+                (tab.splitView && tab.splitView.webContents === webContents)) {
+              if (!webContents.navigationHistory.canGoBack()) {
+                tabIdToClose = id;
+              }
+              break;
+            }
+          }
+          if (tabIdToClose) {
+            closeTab(tabIdToClose, targetWin);
+          }
+          
+          state.downloadsWindow.webContents.send('download-started', {
             id: Date.now().toString(),
             filename: item.getFilename(),
             totalBytes: item.getTotalBytes(),
             state: item.getState()
           });
 
-          item.on('updated', (event, state) => {
-            if (state === 'interrupted') {
-              targetWin.webContents.send('download-interrupted', item.getFilename());
-            } else if (state === 'progressing') {
+          item.on('updated', (event, dlState) => {
+            if (dlState === 'interrupted') {
+              state.downloadsWindow.webContents.send('download-interrupted', item.getFilename());
+            } else if (dlState === 'progressing') {
               if (!item.isPaused()) {
-                targetWin.webContents.send('download-progress', {
+                state.downloadsWindow.webContents.send('download-progress', {
                   filename: item.getFilename(),
                   receivedBytes: item.getReceivedBytes(),
                   totalBytes: item.getTotalBytes()
@@ -744,20 +854,19 @@ app.whenReady().then(async () => {
             }
           });
 
-          item.once('done', (event, state) => {
-            targetWin.webContents.send('download-done', {
+          item.once('done', (event, dlState) => {
+            state.downloadsWindow.webContents.send('download-done', {
               filename: item.getFilename(),
-              state: state
+              state: dlState
             });
           });
         });
       }
 
-      attachSessionListeners(session.defaultSession);
-      attachSessionListeners(session.fromPartition('in-memory'));
-      console.log('Native Brave adblock-rs engine initialized for all sessions!');
+      attachDownloadListener(session.defaultSession);
+      attachDownloadListener(session.fromPartition('in-memory'));
     } catch (e) {
-      console.log('Failed to initialize adblock-rs:', e.message);
+      console.log('Failed to initialize adblocker:', e.message);
     }
   }
 

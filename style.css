@@ -1,8 +1,11 @@
 :root {
-  /* Fully transparent so acrylic shows 100% */
-  --bg-color: rgba(0, 0, 0, 0); 
+  --bg-main: rgba(30, 30, 30, 0.85);
+  --bg-dark: rgba(15, 15, 15, 0.85);
+  --accent-color: #3b82f6;
+  --bg-color: var(--bg-main);
   --hover-color: rgba(255, 255, 255, 0.15);
   --border-color: rgba(255, 255, 255, 0.05);
+  --border-light: rgba(255, 255, 255, 0.1);
   --text-color: rgba(255, 255, 255, 0.9);
 }
 
@@ -160,7 +163,7 @@ body {
   left: 0;
   bottom: 0;
   width: 240px;
-  background-color: rgba(0, 0, 0, 0.1); /* Very subtle tint */
+  background-color: var(--bg-dark); 
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -556,8 +559,22 @@ body {
   justify-content: center;
 }
 
-#vault-overlay.hidden, #settings-overlay.hidden {
+#vault-overlay.hidden, #settings-overlay.hidden, #theme-editor-overlay.hidden {
   display: none;
+}
+
+#theme-editor-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9998;
+  pointer-events: none;
+}
+
+#theme-editor-modal {
+  pointer-events: auto;
 }
 
 #vault-modal {
@@ -625,3 +642,51 @@ body {
   cursor: pointer;
   margin-left: 10px;
 }
+
+/* Zen Browser UI Features */
+
+/* Sidebar Dock Right */
+body.sidebar-right .sidebar { 
+  left: auto; 
+  right: 0; 
+  border-right: none; 
+  border-left: 1px solid var(--border-color); 
+}
+
+/* URL in Sidebar */
+body.url-in-sidebar .address-bar-container { 
+  padding: 0 5px 15px; 
+  border-bottom: 1px solid var(--border-color); 
+  margin-bottom: 10px; 
+  width: 100%; 
+  max-width: none; 
+}
+
+/* Compact Mode */
+body.compact-mode .sidebar { 
+  width: 60px; 
+  transition: width 0.2s cubic-bezier(0.2, 0, 0, 1); 
+  z-index: 10; 
+  overflow-x: hidden; 
+}
+body.compact-mode .sidebar:hover { width: 240px; }
+body.compact-mode .sidebar:not(:hover) .new-tab-btn,
+body.compact-mode .sidebar:not(:hover) .tab-title,
+body.compact-mode .sidebar:not(:hover) .tabs-header,
+body.compact-mode .sidebar:not(:hover) .sidebar-library {
+  opacity: 0; 
+  pointer-events: none;
+}
+body.compact-mode .sidebar .new-tab-btn,
+body.compact-mode .sidebar .tab-title,
+body.compact-mode .sidebar .tabs-header,
+body.compact-mode .sidebar .sidebar-library {
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+/* Zen Mods */
+body.mod-rounded-tabs .tab { border-radius: 20px; }
+body.mod-hide-nav .nav-controls { display: none; }
+body.mod-hide-lib .sidebar-library { display: none; }
+

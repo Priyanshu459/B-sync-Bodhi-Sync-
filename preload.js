@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('api', {
   onUrlUpdated: (callback) => ipcRenderer.on('url-updated', (_event, url) => callback(url)),
   modalOpened: () => ipcRenderer.send('modal-opened'),
   modalClosed: () => ipcRenderer.send('modal-closed'),
+  sidebarHover: (hovered) => ipcRenderer.send('sidebar-hover', hovered),
 
   // Tab Management
   newTab: () => ipcRenderer.send('new-tab'),
@@ -50,8 +51,5 @@ contextBridge.exposeInMainWorld('api', {
   onOpenVault: (callback) => ipcRenderer.on('open-vault', () => callback()),
 
   // Downloads
-  onDownloadStarted: (callback) => ipcRenderer.on('download-started', (_event, info) => callback(info)),
-  onDownloadProgress: (callback) => ipcRenderer.on('download-progress', (_event, info) => callback(info)),
-  onDownloadDone: (callback) => ipcRenderer.on('download-done', (_event, info) => callback(info)),
-  onDownloadInterrupted: (callback) => ipcRenderer.on('download-interrupted', (_event, filename) => callback(filename))
+  openDownloads: () => ipcRenderer.send('open-downloads')
 });
