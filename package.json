@@ -25,10 +25,15 @@
     ],
     "win": {
       "target": "nsis"
-    }
+    },
+    "asarUnpack": [
+      "**/node_modules/adblock-rs/**/*",
+      "**/*.node"
+    ]
   },
   "dependencies": {
     "@ghostery/adblocker-electron": "^2.18.0",
+    "adblock-rs": "^0.12.5",
     "cross-fetch": "^4.0.0",
     "electron-updater": "^6.1.8"
   },
