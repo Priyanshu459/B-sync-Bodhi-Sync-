@@ -5,6 +5,8 @@ const fetch = require('cross-fetch');
 const path = require('path');
 const fs = require('fs');
 
+app.disableHardwareAcceleration();
+
 process.on('uncaughtException', (error) => {
   fs.writeFileSync(path.join(app.getPath('userData'), 'b-sync-crash.log'), error.stack || error.toString());
 });
