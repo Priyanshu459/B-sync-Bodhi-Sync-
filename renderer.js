@@ -191,7 +191,17 @@ function renderLibrary() {
     
     const content = document.createElement('div');
     content.className = 'lib-content';
-    content.innerHTML = `<div class="lib-title">${item.title}</div><div class="lib-url">${item.url}</div>`;
+    
+    const titleEl = document.createElement('div');
+    titleEl.className = 'lib-title';
+    titleEl.textContent = item.title;
+    
+    const urlEl = document.createElement('div');
+    urlEl.className = 'lib-url';
+    urlEl.textContent = item.url;
+    
+    content.appendChild(titleEl);
+    content.appendChild(urlEl);
     content.addEventListener('click', () => {
       window.api.navigate(item.url);
     });

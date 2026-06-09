@@ -59,11 +59,21 @@ function renderPaletteResults(query) {
   paletteItems.forEach((item, index) => {
     const el = document.createElement('div');
     el.className = `palette-item ${index === 0 ? 'selected' : ''}`;
-    el.innerHTML = `
-      <div class="palette-item-title">${item.title}</div>
-      <div class="palette-item-desc">${item.desc}</div>
-      <div class="palette-item-type">${item.type}</div>
-    `;
+    const titleEl = document.createElement('div');
+    titleEl.className = 'palette-item-title';
+    titleEl.textContent = item.title;
+    
+    const descEl = document.createElement('div');
+    descEl.className = 'palette-item-desc';
+    descEl.textContent = item.desc;
+    
+    const typeEl = document.createElement('div');
+    typeEl.className = 'palette-item-type';
+    typeEl.textContent = item.type;
+    
+    el.appendChild(titleEl);
+    el.appendChild(descEl);
+    el.appendChild(typeEl);
     el.addEventListener('click', () => {
       window.api.sendAction(item.action);
     });

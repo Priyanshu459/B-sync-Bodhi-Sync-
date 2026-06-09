@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 const DB_FILE = 'db.sqlite';
-const SECRET_KEY = 'super_secret_bodhi_sync_key'; // In production, this should be an environment variable
+const SECRET_KEY = process.env.JWT_SECRET || 'super_secret_bodhi_sync_key';
 
 const db = new sqlite3.Database(DB_FILE, (err) => {
   if (err) {
