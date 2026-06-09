@@ -1,5 +1,6 @@
 const { app, BrowserWindow, WebContentsView, ipcMain, session } = require('electron');
 const { ElectronBlocker } = require('@ghostery/adblocker-electron');
+const { autoUpdater } = require('electron-updater');
 const fetch = require('cross-fetch');
 const path = require('path');
 const fs = require('fs');
@@ -419,7 +420,7 @@ function createWindow() {
   // Sync
   ipcMain.handle('auth-register', async (event, { username, password }) => {
     try {
-      const res = await fetch('http://localhost:3000/api/auth/register', {
+      const res = await fetch('http://13.233.208.184/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -434,7 +435,7 @@ function createWindow() {
 
   ipcMain.handle('auth-login', async (event, { username, password }) => {
     try {
-      const res = await fetch('http://localhost:3000/api/auth/login', {
+      const res = await fetch('http://13.233.208.184/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -449,7 +450,7 @@ function createWindow() {
 
   ipcMain.handle('sync-push', async (event, token) => {
     try {
-      const res = await fetch('http://localhost:3000/api/sync/data', {
+      const res = await fetch('http://13.233.208.184/api/sync/data', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -466,7 +467,7 @@ function createWindow() {
 
   ipcMain.handle('sync-pull', async (event, token) => {
     try {
-      const res = await fetch('http://localhost:3000/api/sync/data', {
+      const res = await fetch('http://13.233.208.184/api/sync/data', {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -490,6 +491,13 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+
+  // Check for updates (wrapped in try/catch to prevent crashes in development)
+  try {
+    autoUpdater.checkForUpdatesAndNotify().catch(err => console.log('Updater info:', err.message));
+  } catch (err) {
+    console.log('Updater failed to start:', err.message);
+  }
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
