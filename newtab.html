@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>New Tab</title>
+  <link rel="stylesheet" href="newtab.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+
+<body>
+
+  <div class="app-container">
+
+    <!-- Ambient Light Mesh -->
+    <div class="ambient-light"></div>
+    <div class="ambient-light-2"></div>
+
+    <!-- Top Nav / Meta info -->
+    <header class="header">
+      <div class="logo">BODHI // WORKSPACE</div>
+      <div class="meta-data" id="current-date">--</div>
+    </header>
+
+    <!-- Main Command Center -->
+    <main class="command-center">
+
+      <!-- Clock & Greeting (Left Column Focus) -->
+      <section class="hero">
+        <h1 id="clock" class="mono-clock">--:--</h1>
+        <p class="greeting" id="greeting-text">Initializing...</p>
+      </section>
+
+      <!-- Raycast/Spotlight style Search -->
+      <section class="glow-card search-card">
+        <div class="glow-content">
+          <div class="search-wrapper">
+            <i class="ph-bold ph-magnifying-glass search-icon"></i>
+            <input type="text" id="search-input" placeholder="Type a command or search..." autocomplete="off"
+              spellcheck="false" autofocus>
+            <div class="kbd">⌘K</div>
+          </div>
+          <div id="search-suggestions" class="suggestions-list hidden"></div>
+        </div>
+      </section>
+
+      <!-- Grid Layout for Widgets -->
+      <section class="grid-system">
+
+        <!-- Tasks Widget -->
+        <div class="glow-card grid-col-2">
+          <div class="glow-content widget">
+            <div class="widget-header">
+              <span>TASKS</span>
+              <i class="ph-bold ph-dots-three"></i>
+            </div>
+            <div class="task-list" id="task-container">
+              <!-- populated by js -->
+            </div>
+            <div class="task-input-wrapper">
+              <input type="text" id="new-task-input" placeholder="Add a new task..." autocomplete="off" spellcheck="false">
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Links Widget -->
+        <div class="glow-card">
+          <div class="glow-content widget">
+            <div class="widget-header">
+              <span>SHORTCUTS</span>
+            </div>
+            <div class="links-list" id="links-container">
+              <!-- populated by js -->
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Assistant / Terminal Output style -->
+        <div class="glow-card grid-col-2">
+          <div class="glow-content widget">
+            <div class="widget-header">
+              <span>COPILOT</span>
+              <span class="status-dot"></span>
+            </div>
+            <div class="ai-prompts" id="ai-container">
+              <!-- populated by js -->
+            </div>
+          </div>
+        </div>
+
+        <!-- System Stats / Market -->
+        <div class="glow-card">
+          <div class="glow-content widget">
+            <div class="widget-header">
+              <span>MARKETS</span>
+            </div>
+            <div class="market-list" id="market-container">
+              <!-- populated by js -->
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <script src="newtab.js"></script>
+</body>
+
+</html>

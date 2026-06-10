@@ -5,6 +5,11 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
+const isDev = !app.isPackaged;
+if (isDev) {
+  app.setPath('userData', path.join(app.getPath('appData'), 'BodhiSync-Dev'));
+}
+
 // Hardware acceleration is enabled by default to ensure best performance.
 // Compatibility flags below fix black screens/crashes on dual GPU setups (e.g. ASUS TUF).
 app.commandLine.appendSwitch('disable-gpu-sandbox');
@@ -92,10 +97,7 @@ function getSearchUrl(query) {
 }
 
 function getHomepageUrl() {
-  if (settings.searchEngine === 'bing') return 'https://www.bing.com';
-  if (settings.searchEngine === 'brave') return 'https://search.brave.com';
-  if (settings.searchEngine === 'duckduckgo') return 'https://duckduckgo.com';
-  return 'https://www.google.com';
+  return require('url').pathToFileURL(path.join(__dirname, 'newtab.html')).href;
 }
 
 function recordHistory(url, title) {
@@ -551,6 +553,10 @@ app.on('gpu-process-crashed', (event, killed) => {
 });
 
 // IPC Listeners
+ipcMain.handle('get-search-url', (event, query) => {
+  return getSearchUrl(query);
+});
+
 ipcMain.handle('get-window-source-id', (event) => {
   const win = getMainWindowFromEvent(event);
   return win ? win.getMediaSourceId() : null;
@@ -900,7 +906,7 @@ ipcMain.handle('vault-save', (event, { dataArray, masterPassword }) => {
   return { success: true };
 });
 
-const gotTheLock = app.requestSingleInstanceLock();
+const gotTheLock = isDev ? true : app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
   app.quit();
@@ -954,6 +960,16 @@ if (!gotTheLock) {
       try { blocker.enableBlockingInSession(session.fromPartition('in-memory')); } catch (e) {}
       
       console.log('Ghostery adblocker-electron initialized for all sessions!');
+      
+      let sessionBlockedCount = 0;
+      blocker.on('request-blocked', () => {
+        sessionBlockedCount++;
+        for (const [win] of windowStates) {
+          if (!win.isDestroyed()) {
+            win.webContents.send('ad-blocked', sessionBlockedCount);
+          }
+        }
+      });
       
       function attachDownloadListener(sess) {
         sess.on('will-download', (event, item, webContents) => {

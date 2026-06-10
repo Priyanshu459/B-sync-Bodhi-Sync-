@@ -59,5 +59,8 @@ contextBridge.exposeInMainWorld('api', {
 
   // Auto Update
   onUpdateReady: (callback) => ipcRenderer.on('update-ready', callback),
-  installUpdate: () => ipcRenderer.send('install-update')
+  installUpdate: () => ipcRenderer.send('install-update'),
+
+  // Adblocker
+  onAdBlocked: (callback) => ipcRenderer.on('ad-blocked', (_event, count) => callback(count))
 });

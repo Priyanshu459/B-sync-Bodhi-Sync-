@@ -75,6 +75,9 @@ function renderFavorites() {
     const icon = document.createElement('img');
     try {
       const urlObj = new URL(fav.url);
+      if (urlObj.protocol === 'file:' || !urlObj.hostname) {
+        throw new Error('Local file');
+      }
       icon.src = `https://s2.googleusercontent.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
     } catch(e) {
       icon.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>';
@@ -162,7 +165,11 @@ function updateBookmarkStar(url) {
 }
 
 window.api.onUrlUpdated(async (url) => {
-  addressBar.value = url;
+  if (url.startsWith('file://') && url.endsWith('newtab.html')) {
+    addressBar.value = '';
+  } else {
+    addressBar.value = url;
+  }
   libraryData = await window.api.getData();
   updateBookmarkStar(url);
   if (currentLibraryTab === 'history') {
@@ -225,9 +232,14 @@ function renderTabs() {
     
     const iconEl = document.createElement('img');
     iconEl.className = 'tab-icon';
-    if (tab.url && !tab.url.startsWith('chrome://')) {
-      const urlObj = new URL(tab.url);
-      iconEl.src = `https://s2.googleusercontent.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
+    if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('file://')) {
+      try {
+        const urlObj = new URL(tab.url);
+        if (!urlObj.hostname) throw new Error('Empty hostname');
+        iconEl.src = `https://s2.googleusercontent.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
+      } catch (e) {
+        iconEl.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>';
+      }
     } else {
       iconEl.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>';
     }
@@ -750,3 +762,30 @@ if (btnUpdateInstall) {
     window.api.installUpdate();
   });
 }
+
+// Shield UI Logic
+const btnShield = document.getElementById('btn-shield');
+const shieldBadge = document.getElementById('shield-badge');
+const shieldPanel = document.getElementById('shield-panel');
+const shieldTotalCount = document.getElementById('shield-total-count');
+
+if (window.api.onAdBlocked) {
+  window.api.onAdBlocked((count) => {
+    shieldBadge.style.display = 'block';
+    shieldBadge.innerText = count > 99 ? '99+' : count;
+    if (shieldTotalCount) shieldTotalCount.innerText = count.toLocaleString();
+  });
+}
+
+if (btnShield) {
+  btnShield.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (shieldPanel) shieldPanel.classList.toggle('hidden');
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (shieldPanel && !shieldPanel.classList.contains('hidden') && !shieldPanel.contains(e.target) && btnShield && !btnShield.contains(e.target)) {
+    shieldPanel.classList.add('hidden');
+  }
+});
