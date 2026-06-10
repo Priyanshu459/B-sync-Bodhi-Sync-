@@ -10,6 +10,14 @@ if (isDev) {
   app.setPath('userData', path.join(app.getPath('appData'), 'BodhiSync-Dev'));
 }
 
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('bodhisync', process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient('bodhisync');
+}
+
 // Hardware acceleration is enabled by default to ensure best performance.
 // Compatibility flags below fix black screens/crashes on dual GPU setups (e.g. ASUS TUF).
 app.commandLine.appendSwitch('disable-gpu-sandbox');
@@ -36,7 +44,7 @@ let settings = {
   urlBarPos: 'top',
   mods: { roundedTabs: false, hideNav: false, hideLib: false },
   isFirstRun: true,
-  syncServerUrl: 'http://13.233.208.184',
+  syncServerUrl: 'https://api.bodhisync.online',
   useHardwareAcceleration: true,
   favorites: [
     { url: 'https://youtube.com', title: 'YouTube' },
@@ -228,6 +236,15 @@ function setupViewListeners(view, tabId, pane, win) {
     }
   });
   
+  view.webContents.on('did-start-navigation', (event, newUrl) => {
+    const isGoogleAuth = newUrl.includes('accounts.google.com') || newUrl.includes('mail.google.com') || newUrl.includes('myaccount.google.com');
+    if (isGoogleAuth) {
+      view.webContents.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0');
+    } else {
+      view.webContents.setUserAgent(app.userAgentFallback);
+    }
+  });
+
   view.webContents.on('did-navigate-in-page', (event, newUrl) => {
     const tab = state.tabs.get(tabId);
     if (tab) {
@@ -523,6 +540,8 @@ function createBrowserWindow(isIncognito = false) {
         state.welcomeWindow.focus();
         settings.isFirstRun = false;
         saveData();
+        // Open the automated web onboarding alongside the local modal
+        createTab('https://myauraprofile.vercel.app/welcome', win);
       }, 500);
     }
     createTab(getHomepageUrl(), win);
@@ -914,12 +933,39 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', (event, commandLine, workingDirectory) => {
+    let deepLinkUrl = commandLine.find(arg => arg.startsWith('bodhisync://'));
+    
     if (windowStates.size > 0) {
       const state = Array.from(windowStates.values())[0];
       if (state.win) {
         if (state.win.isMinimized()) state.win.restore();
         state.win.focus();
+        
+        if (deepLinkUrl) {
+          const targetUrl = deepLinkUrl.replace('bodhisync://', 'https://');
+          createTab(targetUrl, state.win);
+        }
       }
+    }
+  });
+
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    if (windowStates.size > 0) {
+      const state = Array.from(windowStates.values())[0];
+      if (state.win) {
+        if (state.win.isMinimized()) state.win.restore();
+        state.win.focus();
+        const targetUrl = url.replace('bodhisync://', 'https://');
+        createTab(targetUrl, state.win);
+      }
+    } else {
+      app.whenReady().then(() => {
+        // App will create a window on ready, we should open this URL in it
+        // A simple way is to push it to a global variable or wait for win to be created
+        // We'll rely on createBrowserWindow creating the default window and we can add the tab later,
+        // but for simplicity, we let the default flow create the first tab.
+      });
     }
   });
 

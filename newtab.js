@@ -22,25 +22,37 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateTime() {
     const now = new Date();
     
-    let hours = now.getHours();
-    let minutes = now.getMinutes();
+    // Explicitly use Indian Standard Time (Asia/Kolkata)
+    const timeOptions = { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true };
+    const timeString = now.toLocaleTimeString('en-US', timeOptions);
     
-    let greeting = 'Good evening.';
-    if (hours >= 5 && hours < 12) greeting = 'Good morning.';
-    else if (hours >= 12 && hours < 17) greeting = 'Good afternoon.';
+    // Reliable way to get the exact hour in IST (0-23)
+    const hourString = new Intl.DateTimeFormat('en-US', { 
+        timeZone: 'Asia/Kolkata', 
+        hour: 'numeric', 
+        hourCycle: 'h23' 
+    }).format(now);
+    const hours = parseInt(hourString, 10);
+    
+    let greeting = '';
+    if (hours >= 5 && hours < 12) {
+        greeting = 'Good morning.';
+    } else if (hours >= 12 && hours < 17) {
+        greeting = 'Good afternoon.';
+    } else if (hours >= 17 && hours < 22) {
+        greeting = 'Good evening.';
+    } else {
+        greeting = 'Good night.';
+    }
     
     if(greetingElement.textContent !== greeting) {
         greetingElement.textContent = greeting;
     }
     
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    minutes = minutes < 10 ? '0' + minutes : minutes;
+    clockElement.textContent = timeString;
     
-    clockElement.textContent = `${hours}:${minutes}`;
-    
-    const options = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
-    const dateString = now.toLocaleDateString('en-US', options).toUpperCase();
+    const dateOptions = { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
+    const dateString = now.toLocaleDateString('en-US', dateOptions).toUpperCase();
     if(dateElement.textContent !== dateString) {
         dateElement.textContent = dateString;
     }
