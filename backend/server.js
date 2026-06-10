@@ -3,13 +3,26 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
+const crypto = require('crypto');
+const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 const DB_FILE = 'db.sqlite';
-const SECRET_KEY = process.env.JWT_SECRET || 'super_secret_bodhi_sync_key';
+
+let SECRET_KEY = process.env.JWT_SECRET;
+if (!SECRET_KEY) {
+  const secretPath = path.join(__dirname, '.secret');
+  if (fs.existsSync(secretPath)) {
+    SECRET_KEY = fs.readFileSync(secretPath, 'utf8').trim();
+  } else {
+    SECRET_KEY = crypto.randomBytes(64).toString('hex');
+    fs.writeFileSync(secretPath, SECRET_KEY, 'utf8');
+  }
+}
 
 const db = new sqlite3.Database(DB_FILE, (err) => {
   if (err) {

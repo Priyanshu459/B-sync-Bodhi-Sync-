@@ -5,7 +5,7 @@
   <title>B-sync</title>
   <link rel="stylesheet" href="style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https: data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https: 'unsafe-inline'; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; img-src 'self' data: https:; connect-src 'self' https: http:; frame-src 'self' https:;">
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
 <body>
@@ -73,6 +73,13 @@
           <option value="duckduckgo" style="background: var(--bg-main); color: white;">DuckDuckGo</option>
         </select>
         
+        <label for="sync-url-input" style="display: block; margin-bottom: 8px; color: rgba(255,255,255,0.8);">Custom Sync Server URL:</label>
+        <input type="text" id="sync-url-input" style="width: 100%; padding: 10px; background: var(--bg-main); border: 1px solid var(--border-light); color: white; border-radius: 4px; margin-bottom: 20px;" placeholder="http://your-server.com">
+
+        <label style="display: flex; align-items: center; margin-bottom: 20px; color: white;">
+          <input type="checkbox" id="hw-accel-check" style="margin-right: 10px;"> Use Hardware Acceleration (Requires Restart)
+        </label>
+
         <hr style="border: 0; border-top: 1px solid var(--border-light); margin: 15px 0;">
         <h3 style="color: white; margin-bottom: 10px; font-size: 14px;">Zen Customization</h3>
         

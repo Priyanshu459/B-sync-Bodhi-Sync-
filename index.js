@@ -5,11 +5,10 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
-app.disableHardwareAcceleration();
-app.commandLine.appendSwitch('no-sandbox');
-app.commandLine.appendSwitch('disable-gpu-sandbox');
+// Hardware acceleration is enabled by default (removed disable call) to prevent video buffering/lag.
 
-
+// Silence NodeJS deprecation warnings (e.g., punycode warning from Electron/Ghostery)
+process.noDeprecation = true;
 
 process.on('uncaughtException', (error) => {
   fs.writeFileSync(path.join(app.getPath('userData'), 'b-sync-crash.log'), error.stack || error.toString());
@@ -28,7 +27,9 @@ let settings = {
   compactMode: false,
   urlBarPos: 'top',
   mods: { roundedTabs: false, hideNav: false, hideLib: false },
-  isFirstRun: true
+  isFirstRun: true,
+  syncServerUrl: 'http://13.233.208.184',
+  useHardwareAcceleration: true
 };
 let bookmarksPath = '';
 let historyPath = '';
@@ -115,7 +116,8 @@ function getWindowState(win) {
       downloadsWindow: null,
       welcomeWindow: null,
       win: win,
-      sidebarHovered: false
+      sidebarHovered: false,
+      isHtmlFullScreen: false
     });
   }
   return windowStates.get(win.id);
@@ -143,6 +145,21 @@ const updateViewBounds = (win) => {
   
   const bounds = win.getContentBounds();
   const tab = state.tabs.get(state.activeTabId);
+  
+  if (win.isFullScreen() && state.isHtmlFullScreen) {
+    if (!tab.splitView) {
+      tab.view.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
+    } else {
+      if (tab.activePane === 'main') {
+        tab.view.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
+        tab.splitView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+      } else {
+        tab.splitView.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
+        tab.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+      }
+    }
+    return;
+  }
   
   const effSidebarWidth = (settings.compactMode && !state.sidebarHovered) ? 60 : SIDEBAR_WIDTH;
   const isRight = settings.sidebarPos === 'right';
@@ -251,6 +268,18 @@ function setupViewListeners(view, tabId, pane, win) {
       createTab(url, win);
     }
     return { action: 'deny' };
+  });
+
+  view.webContents.on('enter-html-full-screen', () => {
+    state.isHtmlFullScreen = true;
+    win.setFullScreen(true);
+    updateViewBounds(win);
+  });
+
+  view.webContents.on('leave-html-full-screen', () => {
+    state.isHtmlFullScreen = false;
+    win.setFullScreen(false);
+    updateViewBounds(win);
   });
 }
 
@@ -478,6 +507,19 @@ historyPath = path.join(app.getPath('userData'), 'history.json');
 vaultPath = path.join(app.getPath('userData'), 'vault_encrypted.json');
 settingsPath = path.join(app.getPath('userData'), 'settings.json');
 loadData();
+
+if (settings.useHardwareAcceleration === false) {
+  app.disableHardwareAcceleration();
+}
+
+app.on('gpu-process-crashed', (event, killed) => {
+  if (settings.useHardwareAcceleration !== false) {
+    settings.useHardwareAcceleration = false;
+    saveData();
+    app.relaunch();
+    app.exit(0);
+  }
+});
 
 // IPC Listeners
 ipcMain.on('sidebar-hover', (event, hovered) => {
@@ -717,7 +759,8 @@ ipcMain.handle('delete-bookmark', (event, index) => {
 // Sync
 ipcMain.handle('auth-register', async (event, { username, password }) => {
   try {
-    const res = await fetch('http://13.233.208.184/api/auth/register', {
+    const serverUrl = settings.syncServerUrl || 'http://13.233.208.184';
+    const res = await fetch(`${serverUrl}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -732,7 +775,8 @@ ipcMain.handle('auth-register', async (event, { username, password }) => {
 
 ipcMain.handle('auth-login', async (event, { username, password }) => {
   try {
-    const res = await fetch('http://13.233.208.184/api/auth/login', {
+    const serverUrl = settings.syncServerUrl || 'http://13.233.208.184';
+    const res = await fetch(`${serverUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -747,7 +791,8 @@ ipcMain.handle('auth-login', async (event, { username, password }) => {
 
 ipcMain.handle('sync-push', async (event, token) => {
   try {
-    const res = await fetch('http://13.233.208.184/api/sync/data', {
+    const serverUrl = settings.syncServerUrl || 'http://13.233.208.184';
+    const res = await fetch(`${serverUrl}/api/sync/data`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -764,7 +809,8 @@ ipcMain.handle('sync-push', async (event, token) => {
 
 ipcMain.handle('sync-pull', async (event, token) => {
   try {
-    const res = await fetch('http://13.233.208.184/api/sync/data', {
+    const serverUrl = settings.syncServerUrl || 'http://13.233.208.184';
+    const res = await fetch(`${serverUrl}/api/sync/data`, {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -805,6 +851,11 @@ ipcMain.handle('vault-save', (event, { dataArray, masterPassword }) => {
 });
 
 app.whenReady().then(async () => {
+  // Prevent MaxListenersExceededWarning when multiple modules (like adblocker) attach to WebContents
+  app.on('web-contents-created', (event, contents) => {
+    contents.setMaxListeners(100);
+  });
+
   // Dynamically spoof a standard Chrome User-Agent using the current Chromium version
   const defaultUA = session.defaultSession.getUserAgent();
   const cleanUA = defaultUA.replace(/b-sync\/[0-9.-]+\s*/, '').replace(/Electron\/[0-9.-]+\s*/, '');
@@ -812,9 +863,13 @@ app.whenReady().then(async () => {
   session.defaultSession.setUserAgent(cleanUA);
   session.fromPartition('in-memory').setUserAgent(cleanUA);
 
+  const chromeVersionMatch = cleanUA.match(/Chrome\/(\d+)/);
+  const chromeVersion = chromeVersionMatch ? chromeVersionMatch[1] : '123';
+  const secChUa = `"Google Chrome";v="${chromeVersion}", "Not:A-Brand";v="8", "Chromium";v="${chromeVersion}"`;
+
   const setupHeaders = (sess) => {
     sess.webRequest.onBeforeSendHeaders((details, callback) => {
-      details.requestHeaders['Sec-CH-UA'] = '"Brave";v="123", "Not:A-Brand";v="8", "Chromium";v="123"';
+      details.requestHeaders['Sec-CH-UA'] = secChUa;
       details.requestHeaders['Sec-CH-UA-Mobile'] = '?0';
       details.requestHeaders['Sec-CH-UA-Platform'] = '"Windows"';
       details.requestHeaders['User-Agent'] = cleanUA;
@@ -828,7 +883,7 @@ app.whenReady().then(async () => {
     try {
       const { ElectronBlocker } = require('@ghostery/adblocker-electron');
       
-      const blocker = await ElectronBlocker.fromPrebuiltFull(fetch);
+      const blocker = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
       
       try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) {}
       try { blocker.enableBlockingInSession(session.fromPartition('in-memory')); } catch (e) {}

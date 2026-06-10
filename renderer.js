@@ -358,6 +358,8 @@ const btnSettings = document.getElementById('btn-settings');
 const settingsOverlay = document.getElementById('settings-overlay');
 const btnCloseSettings = document.getElementById('btn-close-settings');
 const searchEngineSelect = document.getElementById('search-engine-select');
+const syncUrlInput = document.getElementById('sync-url-input');
+const hwAccelCheck = document.getElementById('hw-accel-check');
 const btnSaveSettings = document.getElementById('btn-save-settings');
 
 const sidebarPosSelect = document.getElementById('sidebar-pos-select');
@@ -410,6 +412,8 @@ btnSettings.addEventListener('click', async () => {
   window.api.modalOpened();
   const settings = await window.api.getSettings();
   searchEngineSelect.value = settings.searchEngine || 'google';
+  syncUrlInput.value = settings.syncServerUrl || 'http://13.233.208.184';
+  hwAccelCheck.checked = settings.useHardwareAcceleration !== false;
   sidebarPosSelect.value = settings.sidebarPos || 'left';
   urlPosSelect.value = settings.urlBarPos || 'top';
   compactModeCheck.checked = settings.compactMode || false;
@@ -428,6 +432,10 @@ btnCloseSettings.addEventListener('click', () => {
 
 btnSaveSettings.addEventListener('click', async () => {
   await window.api.updateSetting('searchEngine', searchEngineSelect.value);
+  if (syncUrlInput.value) {
+    await window.api.updateSetting('syncServerUrl', syncUrlInput.value);
+  }
+  await window.api.updateSetting('useHardwareAcceleration', hwAccelCheck.checked);
   settingsOverlay.classList.add('hidden');
   window.api.modalClosed();
 });
