@@ -741,25 +741,57 @@ if (btnRecord) {
 
 // Auto Update Logic
 const updatePanel = document.getElementById('update-panel');
-const btnUpdateLater = document.getElementById('btn-update-later');
-const btnUpdateInstall = document.getElementById('btn-update-install');
+const updateTextContainer = document.getElementById('update-text-container');
+const updateActionsContainer = document.getElementById('update-actions-container');
 
-if (window.api.onUpdateReady) {
-  window.api.onUpdateReady(() => {
+if (window.api.onUpdateAvailable) {
+  window.api.onUpdateAvailable((version) => {
+    updateTextContainer.innerHTML = `
+      <strong>Update Available</strong>
+      <p>Version ${version} is available. Do you want to download it?</p>
+    `;
+    updateActionsContainer.innerHTML = `
+      <button id="btn-update-dismiss" class="btn-secondary">Later</button>
+      <button id="btn-update-download" class="btn-primary">Download</button>
+    `;
+    
+    document.getElementById('btn-update-dismiss').addEventListener('click', () => {
+      updatePanel.classList.add('hidden');
+    });
+    
+    document.getElementById('btn-update-download').addEventListener('click', () => {
+      updateTextContainer.innerHTML = `
+        <strong>Downloading Update</strong>
+        <p>Please wait, downloading in background...</p>
+      `;
+      updateActionsContainer.innerHTML = ``;
+      window.api.downloadUpdate();
+    });
+
     updatePanel.classList.remove('hidden');
   });
 }
 
-if (btnUpdateLater) {
-  btnUpdateLater.addEventListener('click', () => {
-    updatePanel.classList.add('hidden');
-  });
-}
+if (window.api.onUpdateReady) {
+  window.api.onUpdateReady(() => {
+    updateTextContainer.innerHTML = `
+      <strong>Update Ready</strong>
+      <p>A new version of Bodhi Sync is ready to install.</p>
+    `;
+    updateActionsContainer.innerHTML = `
+      <button id="btn-update-later" class="btn-secondary">Later</button>
+      <button id="btn-update-install" class="btn-primary">Restart & Update</button>
+    `;
+    
+    document.getElementById('btn-update-later').addEventListener('click', () => {
+      updatePanel.classList.add('hidden');
+    });
+    
+    document.getElementById('btn-update-install').addEventListener('click', () => {
+      window.api.installUpdate();
+    });
 
-if (btnUpdateInstall) {
-  btnUpdateInstall.addEventListener('click', () => {
-    updatePanel.classList.add('hidden');
-    window.api.installUpdate();
+    updatePanel.classList.remove('hidden');
   });
 }
 

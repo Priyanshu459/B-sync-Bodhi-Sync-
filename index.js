@@ -1039,9 +1039,20 @@ if (!gotTheLock) {
     autoUpdater.quitAndInstall();
   });
 
+  ipcMain.on('download-update', () => {
+    autoUpdater.downloadUpdate();
+  });
+
   try {
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = false;
+
+    autoUpdater.on('update-available', (info) => {
+      BrowserWindow.getAllWindows().forEach(w => {
+        w.webContents.send('update-available', info.version);
+      });
+    });
+
     autoUpdater.on('update-downloaded', (info) => {
       BrowserWindow.getAllWindows().forEach(w => {
         w.webContents.send('update-ready');

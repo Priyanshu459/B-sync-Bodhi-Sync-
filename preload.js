@@ -58,6 +58,8 @@ contextBridge.exposeInMainWorld('api', {
   saveRecording: (buffer) => ipcRenderer.invoke('save-recording', buffer),
 
   // Auto Update
+  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (_event, version) => callback(version)),
+  downloadUpdate: () => ipcRenderer.send('download-update'),
   onUpdateReady: (callback) => ipcRenderer.on('update-ready', callback),
   installUpdate: () => ipcRenderer.send('install-update'),
 
