@@ -739,16 +739,18 @@ body.mod-hide-lib .sidebar-library { display: none; }
 /* Auto Update Panel */
 #update-panel {
   position: absolute;
-  top: 70px;
-  right: 20px;
-  width: 320px;
+  top: 12px;
+  right: 15px;
+  width: auto;
   background: rgba(30, 30, 30, 0.95);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
-  box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.6);
   z-index: 10000;
   backdrop-filter: blur(20px);
   overflow: hidden;
+  display: flex;
+  align-items: center;
   transition: opacity 0.3s, transform 0.3s;
   animation: slideInDown 0.4s ease-out;
 }
@@ -766,13 +768,13 @@ body.mod-hide-lib .sidebar-library { display: none; }
 
 .update-content {
   display: flex;
-  padding: 15px;
-  gap: 15px;
+  padding: 8px 15px;
+  gap: 12px;
   align-items: center;
 }
 
 .update-icon {
-  font-size: 28px;
+  font-size: 24px;
   color: #00ff64;
 }
 
@@ -782,32 +784,35 @@ body.mod-hide-lib .sidebar-library { display: none; }
 }
 
 .update-text strong {
-  font-size: 14px;
-  margin-bottom: 4px;
+  font-size: 13px;
+  margin-bottom: 2px;
   color: white;
 }
 
 .update-text p {
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.7);
-  line-height: 1.4;
+  line-height: 1.2;
+  margin: 0;
+  max-width: 250px;
 }
 
 .update-actions {
   display: flex;
-  border-top: 1px solid var(--border-color);
+  height: 100%;
+  border-left: 1px solid var(--border-color);
 }
 
 .update-actions button {
-  flex: 1;
-  padding: 12px;
-  font-size: 13px;
+  padding: 8px 15px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   border: none;
   background: transparent;
   color: white;
   transition: background 0.2s;
+  height: 100%;
 }
 
 #btn-update-later {
