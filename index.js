@@ -315,7 +315,8 @@ function createTab(url, win) {
   const view = new WebContentsView({
     webPreferences: {
       preload: path.join(__dirname, 'preload-tab.js'),
-      contextIsolation: true
+      contextIsolation: true,
+      autoplayPolicy: 'no-user-gesture-required'
     }
   });
   view.setBackgroundColor('#FFFFFF');
@@ -393,7 +394,8 @@ function toggleSplitView(id, win) {
     tab.splitView = new WebContentsView({
       webPreferences: {
         preload: path.join(__dirname, 'preload-tab.js'),
-        contextIsolation: true
+        contextIsolation: true,
+        autoplayPolicy: 'no-user-gesture-required'
       }
     });
     tab.splitView.setBackgroundColor('#FFFFFF');

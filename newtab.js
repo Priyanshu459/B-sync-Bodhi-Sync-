@@ -87,7 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         item.addEventListener('mouseenter', () => {
           selectedIndex = parseInt(item.getAttribute('data-index'));
-          renderSuggestions();
+          document.querySelectorAll('.suggestion-item').forEach(el => el.classList.remove('selected'));
+          item.classList.add('selected');
         });
       });
     }
