@@ -1,11 +1,14 @@
-const { app, BrowserWindow, WebContentsView, ipcMain, session } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, session, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const fetch = require('cross-fetch');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
-// Hardware acceleration is enabled by default (removed disable call) to prevent video buffering/lag.
+// Hardware acceleration is enabled by default to ensure best performance.
+// Compatibility flags below fix black screens/crashes on dual GPU setups (e.g. ASUS TUF).
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('disable-features', 'WidgetLayering,IOSurfaceCapturer,HardwareMediaKeyHandling');
 
 // Silence NodeJS deprecation warnings (e.g., punycode warning from Electron/Ghostery)
 process.noDeprecation = true;
@@ -29,7 +32,11 @@ let settings = {
   mods: { roundedTabs: false, hideNav: false, hideLib: false },
   isFirstRun: true,
   syncServerUrl: 'http://13.233.208.184',
-  useHardwareAcceleration: true
+  useHardwareAcceleration: true,
+  favorites: [
+    { url: 'https://youtube.com', title: 'YouTube' },
+    { url: 'https://github.com', title: 'GitHub' }
+  ]
 };
 let bookmarksPath = '';
 let historyPath = '';
@@ -100,7 +107,7 @@ function recordHistory(url, title) {
 }
 
 let tabIdCounter = 0;
-const TITLEBAR_HEIGHT = 60;
+const TITLEBAR_HEIGHT = 100;
 const SIDEBAR_WIDTH = 240;
 
 const windowStates = new Map();
@@ -136,6 +143,19 @@ function setupGlobalShortcuts(wc, win) {
       event.preventDefault();
       showPalette(win);
     }
+    // Google Console / DevTools shortcuts
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      event.preventDefault();
+      wc.openDevTools({ mode: 'detach' });
+    }
+    if ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i' && input.type === 'keyDown') {
+      event.preventDefault();
+      wc.openDevTools({ mode: 'detach' });
+    }
+    if ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'j' && input.type === 'keyDown') {
+      event.preventDefault();
+      win.webContents.openDevTools({ mode: 'detach' });
+    }
   });
 }
 
@@ -146,7 +166,7 @@ const updateViewBounds = (win) => {
   const bounds = win.getContentBounds();
   const tab = state.tabs.get(state.activeTabId);
   
-  if (win.isFullScreen() && state.isHtmlFullScreen) {
+  if (state.isHtmlFullScreen) {
     if (!tab.splitView) {
       tab.view.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
     } else {
@@ -220,15 +240,18 @@ function setupViewListeners(view, tabId, pane, win) {
   });
 
   view.webContents.on('dom-ready', () => {
-    view.webContents.insertCSS(`
-      div[class*="promo"],
-      div[class*="download-prompt"],
-      a[href*="brave.com/download"],
-      #b-promo,
-      #download-brave-promo {
-        display: none !important;
-      }
-    `);
+    const url = view.webContents.getURL();
+    if (url.includes('search.brave.com')) {
+      view.webContents.insertCSS(`
+        div[class*="promo"],
+        div[class*="download-prompt"],
+        a[href*="brave.com/download"],
+        #b-promo,
+        #download-brave-promo {
+          display: none !important;
+        }
+      `);
+    }
   });
   
   if (pane === 'main') {
@@ -293,6 +316,7 @@ function createTab(url, win) {
       contextIsolation: true
     }
   });
+  view.setBackgroundColor('#FFFFFF');
   setupGlobalShortcuts(view.webContents, win);
   
   state.tabs.set(id, { id, view, splitView: null, activePane: 'main', url, splitUrl: '', title: 'New Tab' });
@@ -370,6 +394,7 @@ function toggleSplitView(id, win) {
         contextIsolation: true
       }
     });
+    tab.splitView.setBackgroundColor('#FFFFFF');
     setupGlobalShortcuts(tab.splitView.webContents, win);
     tab.splitUrl = getHomepageUrl();
     setupViewListeners(tab.splitView, id, 'split', win);
@@ -483,6 +508,8 @@ function createBrowserWindow(isIncognito = false) {
   win.on('resize', () => updateViewBounds(win));
   win.on('maximize', () => updateViewBounds(win));
   win.on('unmaximize', () => updateViewBounds(win));
+  win.on('enter-full-screen', () => updateViewBounds(win));
+  win.on('leave-full-screen', () => updateViewBounds(win));
   
   win.once('ready-to-show', () => {
     win.show();
@@ -508,6 +535,8 @@ vaultPath = path.join(app.getPath('userData'), 'vault_encrypted.json');
 settingsPath = path.join(app.getPath('userData'), 'settings.json');
 loadData();
 
+
+
 if (settings.useHardwareAcceleration === false) {
   app.disableHardwareAcceleration();
 }
@@ -522,6 +551,27 @@ app.on('gpu-process-crashed', (event, killed) => {
 });
 
 // IPC Listeners
+ipcMain.handle('get-window-source-id', (event) => {
+  const win = getMainWindowFromEvent(event);
+  return win ? win.getMediaSourceId() : null;
+});
+
+ipcMain.handle('save-recording', async (event, buffer) => {
+  const win = getMainWindowFromEvent(event);
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    title: 'Save Screen Recording',
+    defaultPath: 'browser_recording.webm',
+    filters: [
+      { name: 'WebM Video', extensions: ['webm'] },
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
+  if (!canceled && filePath) {
+    fs.writeFileSync(filePath, Buffer.from(buffer));
+    return { success: true, filePath };
+  }
+  return { success: false };
+});
 ipcMain.on('sidebar-hover', (event, hovered) => {
   const win = getMainWindowFromEvent(event);
   if (!win) return;
@@ -850,7 +900,22 @@ ipcMain.handle('vault-save', (event, { dataArray, masterPassword }) => {
   return { success: true };
 });
 
-app.whenReady().then(async () => {
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    if (windowStates.size > 0) {
+      const state = Array.from(windowStates.values())[0];
+      if (state.win) {
+        if (state.win.isMinimized()) state.win.restore();
+        state.win.focus();
+      }
+    }
+  });
+
+  app.whenReady().then(async () => {
   // Prevent MaxListenersExceededWarning when multiple modules (like adblocker) attach to WebContents
   app.on('web-contents-created', (event, contents) => {
     contents.setMaxListeners(100);
@@ -954,7 +1019,18 @@ app.whenReady().then(async () => {
   await setupAdblocker();
   createBrowserWindow(false);
 
+  ipcMain.on('install-update', () => {
+    autoUpdater.quitAndInstall();
+  });
+
   try {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on('update-downloaded', (info) => {
+      BrowserWindow.getAllWindows().forEach(w => {
+        w.webContents.send('update-ready');
+      });
+    });
     autoUpdater.checkForUpdatesAndNotify().catch(err => console.log('Updater info:', err.message));
   } catch (err) {
     console.log('Updater failed to start:', err.message);
@@ -968,3 +1044,4 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit();
 });
+} // End of single instance lock

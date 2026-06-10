@@ -51,5 +51,13 @@ contextBridge.exposeInMainWorld('api', {
   onOpenVault: (callback) => ipcRenderer.on('open-vault', () => callback()),
 
   // Downloads
-  openDownloads: () => ipcRenderer.send('open-downloads')
+  openDownloads: () => ipcRenderer.send('open-downloads'),
+
+  // Recording
+  getWindowSourceId: () => ipcRenderer.invoke('get-window-source-id'),
+  saveRecording: (buffer) => ipcRenderer.invoke('save-recording', buffer),
+
+  // Auto Update
+  onUpdateReady: (callback) => ipcRenderer.on('update-ready', callback),
+  installUpdate: () => ipcRenderer.send('install-update')
 });

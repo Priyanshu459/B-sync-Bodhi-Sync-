@@ -62,8 +62,68 @@ function applyZenSettings(settings) {
   }
 }
 
+let favoritesData = [];
+
+function renderFavorites() {
+  const list = document.getElementById('favorites-list');
+  if (!list) return;
+  list.innerHTML = '';
+  favoritesData.forEach((fav, index) => {
+    const el = document.createElement('div');
+    el.className = 'fav-item';
+    
+    const icon = document.createElement('img');
+    try {
+      const urlObj = new URL(fav.url);
+      icon.src = `https://s2.googleusercontent.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
+    } catch(e) {
+      icon.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>';
+    }
+    
+    const text = document.createElement('span');
+    text.textContent = fav.title;
+    
+    const del = document.createElement('button');
+    del.className = 'fav-delete';
+    del.innerHTML = '<i class="ph ph-x"></i>';
+    del.title = 'Remove';
+    del.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      favoritesData.splice(index, 1);
+      await window.api.updateSetting('favorites', favoritesData);
+      renderFavorites();
+    });
+    
+    el.appendChild(icon);
+    el.appendChild(text);
+    el.appendChild(del);
+    
+    el.addEventListener('click', () => {
+      window.api.navigate(fav.url);
+    });
+    
+    list.appendChild(el);
+  });
+}
+
+document.getElementById('btn-add-favorite').addEventListener('click', async () => {
+  const currentUrl = addressBar.value;
+  if (!currentUrl || !currentUrl.startsWith('http')) return;
+  
+  let currentTitle = currentUrl;
+  if (activeTabId && tabs.has(activeTabId)) currentTitle = tabs.get(activeTabId).title;
+  
+  if (!favoritesData.some(f => f.url === currentUrl)) {
+    favoritesData.push({ url: currentUrl, title: currentTitle });
+    await window.api.updateSetting('favorites', favoritesData);
+    renderFavorites();
+  }
+});
+
 window.api.getSettings().then(settings => {
   applyZenSettings(settings);
+  favoritesData = settings.favorites || [];
+  renderFavorites();
 });
 
 // Initial Load
@@ -362,6 +422,11 @@ const syncUrlInput = document.getElementById('sync-url-input');
 const hwAccelCheck = document.getElementById('hw-accel-check');
 const btnSaveSettings = document.getElementById('btn-save-settings');
 
+const recResSelect = document.getElementById('rec-res-select');
+const recFpsSelect = document.getElementById('rec-fps-select');
+const recBitrateSelect = document.getElementById('rec-bitrate-select');
+const recAudioCheck = document.getElementById('rec-audio-check');
+
 const sidebarPosSelect = document.getElementById('sidebar-pos-select');
 const urlPosSelect = document.getElementById('url-pos-select');
 const compactModeCheck = document.getElementById('compact-mode-check');
@@ -422,6 +487,11 @@ btnSettings.addEventListener('click', async () => {
     modHideNav.checked = settings.mods.hideNav || false;
     modHideLib.checked = settings.mods.hideLib || false;
   }
+  const recSet = settings.recording || {};
+  recResSelect.value = recSet.resolution || '1080';
+  recFpsSelect.value = recSet.fps || '60';
+  recBitrateSelect.value = recSet.bitrate || '10000000';
+  recAudioCheck.checked = recSet.audio !== false; // true by default
   settingsOverlay.classList.remove('hidden');
 });
 
@@ -436,6 +506,12 @@ btnSaveSettings.addEventListener('click', async () => {
     await window.api.updateSetting('syncServerUrl', syncUrlInput.value);
   }
   await window.api.updateSetting('useHardwareAcceleration', hwAccelCheck.checked);
+  await window.api.updateSetting('recording', {
+    resolution: recResSelect.value,
+    fps: recFpsSelect.value,
+    bitrate: recBitrateSelect.value,
+    audio: recAudioCheck.checked
+  });
   settingsOverlay.classList.add('hidden');
   window.api.modalClosed();
 });
@@ -582,3 +658,95 @@ document.getElementById('btn-add-pwd').addEventListener('click', async () => {
   document.getElementById('vault-pwd-input').value = '';
   renderVault();
 });
+
+// Screen Recording Logic
+const btnRecord = document.getElementById('btn-record');
+let mediaRecorder = null;
+let recordedChunks = [];
+
+if (btnRecord) {
+  btnRecord.addEventListener('click', async () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      btnRecord.classList.remove('recording');
+      btnRecord.title = "Record Browser";
+    } else {
+      try {
+        const sourceId = await window.api.getWindowSourceId();
+        if (!sourceId) throw new Error("Could not get window source ID");
+        
+        const settings = await window.api.getSettings();
+        const recSet = settings.recording || { resolution: '1080', fps: '60', bitrate: '10000000', audio: true };
+        const maxDim = recSet.resolution === '2160' ? 2160 : (recSet.resolution === '1440' ? 1440 : 1080);
+        const maxWidth = recSet.resolution === '2160' ? 3840 : (recSet.resolution === '1440' ? 2560 : 1920);
+        const maxFps = parseInt(recSet.fps, 10);
+        const bitrate = parseInt(recSet.bitrate, 10);
+        
+        const audioConstraint = recSet.audio ? { mandatory: { chromeMediaSource: 'desktop' } } : false;
+        
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: audioConstraint,
+          video: {
+            mandatory: {
+              chromeMediaSource: 'desktop',
+              chromeMediaSourceId: sourceId,
+              minWidth: 1280,
+              maxWidth: maxWidth,
+              minHeight: 720,
+              maxHeight: maxDim,
+              maxFrameRate: maxFps
+            }
+          }
+        });
+        
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9', videoBitsPerSecond: bitrate });
+        
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+        
+        mediaRecorder.onstop = async () => {
+          stream.getTracks().forEach(track => track.stop());
+          const blob = new Blob(recordedChunks, { type: 'video/webm; codecs=vp9' });
+          const arrayBuffer = await blob.arrayBuffer();
+          const res = await window.api.saveRecording(arrayBuffer);
+          if (res && res.success) {
+            console.log('Saved to', res.filePath);
+          }
+        };
+        
+        mediaRecorder.start(1000);
+        btnRecord.classList.add('recording');
+        btnRecord.title = "Stop Recording";
+      } catch (err) {
+        console.error("Recording failed:", err);
+        if (window.api.logError) window.api.logError("Recording failed: " + err.message);
+      }
+    }
+  });
+}
+
+// Auto Update Logic
+const updatePanel = document.getElementById('update-panel');
+const btnUpdateLater = document.getElementById('btn-update-later');
+const btnUpdateInstall = document.getElementById('btn-update-install');
+
+if (window.api.onUpdateReady) {
+  window.api.onUpdateReady(() => {
+    updatePanel.classList.remove('hidden');
+  });
+}
+
+if (btnUpdateLater) {
+  btnUpdateLater.addEventListener('click', () => {
+    updatePanel.classList.add('hidden');
+  });
+}
+
+if (btnUpdateInstall) {
+  btnUpdateInstall.addEventListener('click', () => {
+    updatePanel.classList.add('hidden');
+    window.api.installUpdate();
+  });
+}

@@ -16,6 +16,7 @@
       <button id="btn-forward" class="nav-btn" title="Go forward"><i class="ph ph-caret-right"></i></button>
       <button id="btn-reload" class="nav-btn" title="Reload"><i class="ph ph-arrow-clockwise"></i></button>
       <button id="btn-split" class="nav-btn" title="Split View"><i class="ph ph-columns"></i></button>
+      <button id="btn-record" class="nav-btn" title="Record Browser"><i class="ph ph-video-camera"></i></button>
     </div>
     
     <div class="address-bar-container">
@@ -29,6 +30,12 @@
       <button id="btn-maximize" class="win-btn" title="Maximize"><i class="ph ph-square"></i></button>
       <button id="btn-close" class="win-btn close" title="Close"><i class="ph ph-x"></i></button>
     </div>
+  </div>
+
+  <!-- Quick Access Bar -->
+  <div class="quick-access-bar" id="quick-access-bar">
+    <div id="favorites-list"></div>
+    <button id="btn-add-favorite" title="Add current tab to Quick Access"><i class="ph ph-plus"></i></button>
   </div>
 
   <!-- Sidebar (Left) -->
@@ -47,6 +54,14 @@
       </div>
       <div id="library-list" class="sidebar-lib-list"></div>
     </div>
+    
+    <div class="sidebar-footer">
+      <img src="creator.jpg" alt="Priyanshu Patel" class="creator-avatar">
+      <div class="creator-details">
+        <span class="creator-name">Priyanshu Patel</span>
+        <span class="creator-role">Creator</span>
+      </div>
+    </div>
   </div>
 
   <!-- Command Palette Overlay -->
@@ -59,7 +74,7 @@
 
   <!-- Settings Overlay -->
   <div id="settings-overlay" class="hidden">
-    <div id="settings-modal" style="background: var(--bg-dark); border: 1px solid var(--border-light); padding: 20px; border-radius: 8px; width: 400px; margin: 100px auto;">
+    <div id="settings-modal" style="background: var(--bg-dark); border: 1px solid var(--border-light); padding: 20px; border-radius: 8px; width: 400px; margin: 50px auto; max-height: 80vh; overflow-y: auto;">
       <div class="vault-header">
         <h2><i class="ph ph-gear"></i> Browser Settings</h2>
         <button id="btn-close-settings" class="icon-btn"><i class="ph ph-x"></i></button>
@@ -109,6 +124,35 @@
         <label style="display: flex; align-items: center; margin-bottom: 20px; color: rgba(255,255,255,0.8);">
           <input type="checkbox" id="mod-hide-lib" style="margin-right: 10px;"> Hide Library Tabs
         </label>
+        
+        <hr style="border: 0; border-top: 1px solid var(--border-light); margin: 15px 0;">
+        <h3 style="color: white; margin-bottom: 10px; font-size: 14px;">Recording Settings</h3>
+        
+        <label for="rec-res-select" style="display: block; margin-bottom: 8px; color: rgba(255,255,255,0.8);">Resolution:</label>
+        <select id="rec-res-select" style="width: 100%; padding: 10px; background: var(--bg-main); border: 1px solid var(--border-light); color: white; border-radius: 4px; margin-bottom: 15px;">
+          <option value="1080">1080p (FHD)</option>
+          <option value="1440">1440p (2K)</option>
+          <option value="2160">2160p (4K)</option>
+        </select>
+
+        <label for="rec-fps-select" style="display: block; margin-bottom: 8px; color: rgba(255,255,255,0.8);">Frame Rate (FPS):</label>
+        <select id="rec-fps-select" style="width: 100%; padding: 10px; background: var(--bg-main); border: 1px solid var(--border-light); color: white; border-radius: 4px; margin-bottom: 15px;">
+          <option value="30">30 FPS</option>
+          <option value="60">60 FPS</option>
+          <option value="120">120 FPS</option>
+        </select>
+
+        <label for="rec-bitrate-select" style="display: block; margin-bottom: 8px; color: rgba(255,255,255,0.8);">Video Quality (Bitrate):</label>
+        <select id="rec-bitrate-select" style="width: 100%; padding: 10px; background: var(--bg-main); border: 1px solid var(--border-light); color: white; border-radius: 4px; margin-bottom: 15px;">
+          <option value="5000000">5 Mbps (Normal)</option>
+          <option value="10000000">10 Mbps (High)</option>
+          <option value="20000000">20 Mbps (Ultra)</option>
+        </select>
+
+        <label style="display: flex; align-items: center; margin-bottom: 20px; color: white;">
+          <input type="checkbox" id="rec-audio-check" style="margin-right: 10px;"> Record System Audio
+        </label>
+
         <button id="btn-save-settings" class="btn-primary" style="width: 100%;">Save Changes</button>
       </div>
     </div>
@@ -163,6 +207,21 @@
         </label>
         <button id="btn-save-theme" class="btn-primary" style="width: 100%;">Apply Theme</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Auto Update Panel -->
+  <div id="update-panel" class="hidden">
+    <div class="update-content">
+      <div class="update-icon"><i class="ph ph-arrow-circle-up"></i></div>
+      <div class="update-text">
+        <strong>Update Ready</strong>
+        <p>A new version of Bodhi Sync is ready to install.</p>
+      </div>
+    </div>
+    <div class="update-actions">
+      <button id="btn-update-later" class="btn-secondary">Later</button>
+      <button id="btn-update-install" class="btn-primary">Restart & Update</button>
     </div>
   </div>
 
