@@ -80,7 +80,7 @@ function renderFavorites() {
       }
       icon.src = `https://s2.googleusercontent.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
     } catch(e) {
-      icon.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>';
+      icon.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%2318181b"/><text x="50%25" y="50%25" font-family="monospace" font-weight="bold" font-size="55" fill="%23fafafa" text-anchor="middle" dominant-baseline="central">B</text><circle cx="80" cy="20" r="8" fill="%2310b981"/></svg>';
     }
     
     const text = document.createElement('span');
@@ -238,10 +238,10 @@ function renderTabs() {
         if (!urlObj.hostname) throw new Error('Empty hostname');
         iconEl.src = `https://s2.googleusercontent.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
       } catch (e) {
-        iconEl.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>';
+        iconEl.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%2318181b"/><text x="50%25" y="50%25" font-family="monospace" font-weight="bold" font-size="55" fill="%23fafafa" text-anchor="middle" dominant-baseline="central">B</text><circle cx="80" cy="20" r="8" fill="%2310b981"/></svg>';
       }
     } else {
-      iconEl.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>';
+      iconEl.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%2318181b"/><text x="50%25" y="50%25" font-family="monospace" font-weight="bold" font-size="55" fill="%23fafafa" text-anchor="middle" dominant-baseline="central">B</text><circle cx="80" cy="20" r="8" fill="%2310b981"/></svg>';
     }
     
     const titleEl = document.createElement('span');

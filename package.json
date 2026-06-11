@@ -17,6 +17,7 @@
   "build": {
     "appId": "com.priyanshu.bsync",
     "productName": "Bodhi Sync Browser",
+    "icon": "icon.png",
     "publish": [
       {
         "provider": "github",

@@ -22,9 +22,13 @@ if (process.defaultApp) {
 // Compatibility flags below fix black screens/crashes on dual GPU setups (e.g. ASUS TUF).
 app.commandLine.appendSwitch('disable-gpu-sandbox');
 app.commandLine.appendSwitch('disable-features', 'WidgetLayering,IOSurfaceCapturer,HardwareMediaKeyHandling');
+app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 
 // Silence NodeJS deprecation warnings (e.g., punycode warning from Electron/Ghostery)
 process.noDeprecation = true;
+
+// Set a standard Chrome User-Agent globally so AI sites (ChatGPT, Claude) don't block the browser
+app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
 process.on('uncaughtException', (error) => {
   fs.writeFileSync(path.join(app.getPath('userData'), 'b-sync-crash.log'), error.stack || error.toString());
@@ -487,6 +491,7 @@ function createBrowserWindow(isIncognito = false) {
     backgroundMaterial: 'acrylic',
     vibrancy: 'fullscreen-ui',
     backgroundColor: '#00000000',
+    icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
       partition: isIncognito ? 'in-memory' : 'persist:default',
       preload: path.join(__dirname, 'preload.js'),
@@ -1002,10 +1007,19 @@ if (!gotTheLock) {
     try {
       const { ElectronBlocker } = require('@ghostery/adblocker-electron');
       
-      const blocker = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
+      const blocker = await ElectronBlocker.fromPrebuiltAdsOnly(fetch);
       
       try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) {}
       try { blocker.enableBlockingInSession(session.fromPartition('in-memory')); } catch (e) {}
+      
+      // Remove Ghostery's aggressive preload script to prevent Next.js crashes on AI sites (ChatGPT/Claude)
+      [session.defaultSession, session.fromPartition('in-memory')].forEach(s => {
+        try {
+          const preloads = s.getPreloads();
+          const cleanPreloads = preloads.filter(p => !p.includes('adblocker'));
+          s.setPreloads(cleanPreloads);
+        } catch (err) { console.log(err); }
+      });
       
       console.log('Ghostery adblocker-electron initialized for all sessions!');
       
