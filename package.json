@@ -15,9 +15,17 @@
   "license": "ISC",
   "type": "commonjs",
   "build": {
+    "compression": "maximum",
     "appId": "com.priyanshu.bsync",
     "productName": "Bodhi Sync Browser",
     "icon": "icon.png",
+    "files": [
+      "**/*",
+      "!backend",
+      "!electron.zip",
+      "!**/*.log",
+      "!package-lock.json"
+    ],
     "publish": [
       {
         "provider": "github",
@@ -30,8 +38,7 @@
         {
           "target": "nsis",
           "arch": [
-            "x64",
-            "ia32"
+            "x64"
           ]
         }
       ]

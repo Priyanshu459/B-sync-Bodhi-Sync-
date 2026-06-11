@@ -196,10 +196,16 @@ function renderTabs() {
     tabEl.addEventListener('dragstart', (e) => {
       e.dataTransfer.setData('text/plain', id);
       tabEl.classList.add('dragging');
+      const overlay = document.getElementById('drag-overlay');
+      if (overlay) overlay.classList.remove('hidden');
+      if (window.api.setDragMode) window.api.setDragMode(true);
     });
     
     tabEl.addEventListener('dragend', () => {
       tabEl.classList.remove('dragging');
+      const overlay = document.getElementById('drag-overlay');
+      if (overlay) overlay.classList.add('hidden');
+      if (window.api.setDragMode) window.api.setDragMode(false);
     });
     
     tabEl.addEventListener('dragover', (e) => {
@@ -214,19 +220,20 @@ function renderTabs() {
     tabEl.addEventListener('drop', (e) => {
       e.preventDefault();
       tabEl.classList.remove('drag-over');
-      const draggedId = Number(e.dataTransfer.getData('text/plain'));
-      if (draggedId !== id) {
+      const draggedId = e.dataTransfer.getData('text/plain');
+      if (draggedId && draggedId !== id) {
         // Reorder map entries by rebuilding the map
         const newTabs = new Map();
         const draggedTab = tabs.get(draggedId);
-        
-        tabs.forEach((t, tId) => {
-          if (tId === id) newTabs.set(draggedId, draggedTab); // Insert before
-          if (tId !== draggedId) newTabs.set(tId, t);
-        });
-        
-        tabs = newTabs;
-        renderTabs();
+        if (draggedTab) {
+          tabs.forEach((t, tId) => {
+            if (tId === id) newTabs.set(draggedId, draggedTab); // Insert before
+            if (tId !== draggedId) newTabs.set(tId, t);
+          });
+          
+          tabs = newTabs;
+          renderTabs();
+        }
       }
     });
     
@@ -266,6 +273,67 @@ function renderTabs() {
     tabEl.appendChild(titleEl);
     tabEl.appendChild(closeBtn);
     tabsContainer.appendChild(tabEl);
+    
+    // Render pane sub-items if there are multiple panes
+    if (tab.panes && tab.panes.length > 1) {
+      const panesContainer = document.createElement('div');
+      panesContainer.className = 'pane-sub-items';
+      tab.panes.forEach(pane => {
+        const paneEl = document.createElement('div');
+        paneEl.className = 'pane-sub-item';
+        paneEl.draggable = true;
+        
+        paneEl.addEventListener('dragstart', (e) => {
+          e.stopPropagation();
+          e.dataTransfer.setData('application/pane-id', pane.id);
+          paneEl.classList.add('dragging');
+          const overlay = document.getElementById('drag-overlay');
+          if (overlay) overlay.classList.remove('hidden');
+          if (window.api.setDragMode) window.api.setDragMode(true);
+        });
+        
+        paneEl.addEventListener('dragend', (e) => {
+          e.stopPropagation();
+          paneEl.classList.remove('dragging');
+          const overlay = document.getElementById('drag-overlay');
+          if (overlay) overlay.classList.add('hidden');
+          if (window.api.setDragMode) window.api.setDragMode(false);
+        });
+        
+        const pIcon = document.createElement('img');
+        pIcon.className = 'tab-icon';
+        pIcon.style.width = '12px';
+        pIcon.style.height = '12px';
+        if (pane.url && !pane.url.startsWith('chrome://') && !pane.url.startsWith('file://')) {
+          try {
+            const u = new URL(pane.url);
+            pIcon.src = `https://s2.googleusercontent.com/s2/favicons?domain=${u.hostname}&sz=16`;
+          } catch(e) {
+            pIcon.src = iconEl.src;
+          }
+        } else pIcon.src = iconEl.src;
+        
+        const pTitle = document.createElement('span');
+        pTitle.className = 'pane-title';
+        pTitle.textContent = pane.title || 'Loading...';
+        pTitle.title = pTitle.textContent;
+        
+        const pClose = document.createElement('button');
+        pClose.className = 'pane-close';
+        pClose.innerHTML = '<i class="ph ph-x"></i>';
+        pClose.title = 'Close pane';
+        pClose.addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.api.closePane({ tabId: id, paneId: pane.id });
+        });
+        
+        paneEl.appendChild(pIcon);
+        paneEl.appendChild(pTitle);
+        paneEl.appendChild(pClose);
+        panesContainer.appendChild(paneEl);
+      });
+      tabsContainer.appendChild(panesContainer);
+    }
   });
 }
 
@@ -821,3 +889,104 @@ document.addEventListener('click', (e) => {
     shieldPanel.classList.add('hidden');
   }
 });
+
+// Drop Zones Logic
+const dragOverlay = document.getElementById('drag-overlay');
+const dropZones = document.querySelectorAll('.drop-zone');
+
+dropZones.forEach(zone => {
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    zone.classList.add('drag-over');
+  });
+  
+  zone.addEventListener('dragleave', () => {
+    zone.classList.remove('drag-over');
+  });
+  
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    if (dragOverlay) dragOverlay.classList.add('hidden');
+    
+    const paneId = e.dataTransfer.getData('application/pane-id');
+    const sourceId = e.dataTransfer.getData('text/plain');
+    const region = zone.getAttribute('data-region');
+    
+    if (paneId && window.api.repositionPane) {
+      window.api.repositionPane({ paneId, targetTabId: activeTabId, region });
+      return;
+    }
+    
+    if (!sourceId || !window.api.mergeTabs) return;
+
+    if (sourceId === activeTabId) {
+      window.api.toggleSplit();
+    } else {
+      window.api.mergeTabs({ sourceId, targetId: activeTabId, region });
+    }
+  });
+});
+
+// Resizable Pane Dividers
+if (window.api.onSyncDividers) {
+  window.api.onSyncDividers((dividers) => {
+    const existing = document.querySelectorAll('.pane-divider');
+    
+    // If the number of dividers hasn't changed, just update their positions
+    // This prevents destroying the element while it's being dragged!
+    if (existing.length === dividers.length && existing.length > 0) {
+      dividers.forEach((div, i) => {
+        const el = existing[i];
+        el.style.left = div.x + 'px';
+        el.style.top = div.y + 'px';
+        el.style.width = div.width + 'px';
+        el.style.height = div.height + 'px';
+      });
+      return;
+    }
+    
+    // Remove old dividers if counts mismatch
+    existing.forEach(el => el.remove());
+    
+    dividers.forEach(div => {
+      const el = document.createElement('div');
+      el.className = 'pane-divider';
+      el.setAttribute('data-type', div.type);
+      el.style.left = div.x + 'px';
+      el.style.top = div.y + 'px';
+      el.style.width = div.width + 'px';
+      el.style.height = div.height + 'px';
+      
+      let isDraggingDivider = false;
+
+      el.addEventListener('pointerdown', (e) => {
+        isDraggingDivider = true;
+        el.classList.add('dragging');
+        el.setPointerCapture(e.pointerId);
+        document.body.style.cursor = div.type === 'vertical' ? 'col-resize' : 'row-resize';
+      });
+      
+      el.addEventListener('pointermove', (e) => {
+        if (!isDraggingDivider) return;
+        
+        if (div.type === 'vertical') {
+          window.api.setSplitRatio({ mouseX: e.clientX });
+        } else {
+          window.api.setSplitRatio({ mouseY: e.clientY });
+        }
+      });
+      
+      el.addEventListener('pointerup', (e) => {
+        if (isDraggingDivider) {
+          isDraggingDivider = false;
+          el.classList.remove('dragging');
+          el.releasePointerCapture(e.pointerId);
+          document.body.style.cursor = '';
+        }
+      });
+      
+      document.body.appendChild(el);
+    });
+  });
+}

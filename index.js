@@ -24,6 +24,10 @@ app.commandLine.appendSwitch('disable-gpu-sandbox');
 app.commandLine.appendSwitch('disable-features', 'WidgetLayering,IOSurfaceCapturer,HardwareMediaKeyHandling');
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 
+// Speed Optimizations
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+
 // Silence NodeJS deprecation warnings (e.g., punycode warning from Electron/Ghostery)
 process.noDeprecation = true;
 
@@ -179,19 +183,23 @@ const updateViewBounds = (win) => {
   
   const bounds = win.getContentBounds();
   const tab = state.tabs.get(state.activeTabId);
+  if (!tab || !tab.panes) return;
+  
+  if (state.dragMode) {
+    tab.panes.forEach((pane) => {
+      pane.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+    });
+    return;
+  }
   
   if (state.isHtmlFullScreen) {
-    if (!tab.splitView) {
-      tab.view.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
-    } else {
-      if (tab.activePane === 'main') {
-        tab.view.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
-        tab.splitView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+    tab.panes.forEach((pane, i) => {
+      if (i === tab.activePaneIndex) {
+        pane.view.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
       } else {
-        tab.splitView.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
-        tab.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+        pane.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       }
-    }
+    });
     return;
   }
   
@@ -199,29 +207,46 @@ const updateViewBounds = (win) => {
   const isRight = settings.sidebarPos === 'right';
   const viewX = isRight ? 0 : effSidebarWidth;
   const effWidth = bounds.width - effSidebarWidth;
+  const effHeight = bounds.height - TITLEBAR_HEIGHT;
+  const viewY = TITLEBAR_HEIGHT;
   
-  if (!tab.splitView) {
-    tab.view.setBounds({ 
-      x: viewX, 
-      y: TITLEBAR_HEIGHT, 
-      width: effWidth, 
-      height: bounds.height - TITLEBAR_HEIGHT 
-    });
+  const numPanes = tab.panes.length;
+  let dividers = [];
+  
+  const GAP = 4;
+  
+  if (numPanes === 1) {
+    tab.panes[0].view.setBounds({ x: viewX, y: viewY, width: effWidth, height: effHeight });
+  } else if (numPanes === 2) {
+    const splitX = Math.floor(effWidth * (tab.splitX || 0.5));
+    tab.panes[0].view.setBounds({ x: viewX, y: viewY, width: splitX - (GAP/2), height: effHeight });
+    tab.panes[1].view.setBounds({ x: viewX + splitX + (GAP/2), y: viewY, width: effWidth - splitX - (GAP/2), height: effHeight });
+    dividers.push({ type: 'vertical', x: viewX + splitX - (GAP/2), y: viewY, width: GAP, height: effHeight });
+  } else if (numPanes === 3) {
+    const splitX = Math.floor(effWidth * (tab.splitX || 0.5));
+    const splitY = Math.floor(effHeight * (tab.splitY || 0.5));
+    tab.panes[0].view.setBounds({ x: viewX, y: viewY, width: splitX - (GAP/2), height: effHeight });
+    tab.panes[1].view.setBounds({ x: viewX + splitX + (GAP/2), y: viewY, width: effWidth - splitX - (GAP/2), height: splitY - (GAP/2) });
+    tab.panes[2].view.setBounds({ x: viewX + splitX + (GAP/2), y: viewY + splitY + (GAP/2), width: effWidth - splitX - (GAP/2), height: effHeight - splitY - (GAP/2) });
+    
+    dividers.push({ type: 'vertical', x: viewX + splitX - (GAP/2), y: viewY, width: GAP, height: effHeight });
+    dividers.push({ type: 'horizontal', x: viewX + splitX + (GAP/2), y: viewY + splitY - (GAP/2), width: effWidth - splitX - (GAP/2), height: GAP });
   } else {
-    const halfWidth = Math.floor(effWidth / 2);
-    tab.view.setBounds({ 
-      x: viewX, 
-      y: TITLEBAR_HEIGHT, 
-      width: halfWidth, 
-      height: bounds.height - TITLEBAR_HEIGHT 
+    const splitX = Math.floor(effWidth * (tab.splitX || 0.5));
+    const splitY = Math.floor(effHeight * (tab.splitY || 0.5));
+    tab.panes.forEach((pane, i) => {
+      if (i === 0) pane.view.setBounds({ x: viewX, y: viewY, width: splitX - (GAP/2), height: splitY - (GAP/2) });
+      else if (i === 1) pane.view.setBounds({ x: viewX + splitX + (GAP/2), y: viewY, width: effWidth - splitX - (GAP/2), height: splitY - (GAP/2) });
+      else if (i === 2) pane.view.setBounds({ x: viewX, y: viewY + splitY + (GAP/2), width: splitX - (GAP/2), height: effHeight - splitY - (GAP/2) });
+      else if (i === 3) pane.view.setBounds({ x: viewX + splitX + (GAP/2), y: viewY + splitY + (GAP/2), width: effWidth - splitX - (GAP/2), height: effHeight - splitY - (GAP/2) });
+      else pane.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
     });
-    tab.splitView.setBounds({
-      x: viewX + halfWidth,
-      y: TITLEBAR_HEIGHT,
-      width: effWidth - halfWidth,
-      height: bounds.height - TITLEBAR_HEIGHT
-    });
+    
+    dividers.push({ type: 'vertical', x: viewX + splitX - (GAP/2), y: viewY, width: GAP, height: effHeight });
+    dividers.push({ type: 'horizontal', x: viewX, y: viewY + splitY - (GAP/2), width: effWidth, height: GAP });
   }
+  
+  win.webContents.send('sync-dividers', dividers);
 };
 
 function setupViewListeners(view, tabId, pane, win) {
@@ -229,12 +254,12 @@ function setupViewListeners(view, tabId, pane, win) {
   
   view.webContents.on('did-navigate', (event, newUrl) => {
     const tab = state.tabs.get(tabId);
-    if (tab) {
-      if (pane === 'main') tab.url = newUrl;
-      else tab.splitUrl = newUrl;
-      
-      if (pane === 'main') win.webContents.send('tab-updated', { id: tabId, url: newUrl, title: tab.title });
-      if (tabId === state.activeTabId && tab.activePane === pane) {
+    if (tab && pane) {
+      pane.url = newUrl;
+      const simplifiedPanes = tab.panes.map(p => ({ id: p.id, url: p.url, title: p.title }));
+      if (tab.panes[0] === pane) win.webContents.send('tab-updated', { id: tabId, url: newUrl, title: tab.title, panes: simplifiedPanes });
+      else win.webContents.send('tab-updated', { id: tabId, url: tab.panes[0].url, title: tab.title, panes: simplifiedPanes });
+      if (tabId === state.activeTabId && tab.panes[tab.activePaneIndex] === pane) {
         win.webContents.send('url-updated', newUrl);
       }
     }
@@ -251,12 +276,12 @@ function setupViewListeners(view, tabId, pane, win) {
 
   view.webContents.on('did-navigate-in-page', (event, newUrl) => {
     const tab = state.tabs.get(tabId);
-    if (tab) {
-      if (pane === 'main') tab.url = newUrl;
-      else tab.splitUrl = newUrl;
-      
-      if (pane === 'main') win.webContents.send('tab-updated', { id: tabId, url: newUrl, title: tab.title });
-      if (tabId === state.activeTabId && tab.activePane === pane) {
+    if (tab && pane) {
+      pane.url = newUrl;
+      const simplifiedPanes = tab.panes.map(p => ({ id: p.id, url: p.url, title: p.title }));
+      if (tab.panes[0] === pane) win.webContents.send('tab-updated', { id: tabId, url: newUrl, title: tab.title, panes: simplifiedPanes });
+      else win.webContents.send('tab-updated', { id: tabId, url: tab.panes[0].url, title: tab.title, panes: simplifiedPanes });
+      if (tabId === state.activeTabId && tab.panes[tab.activePaneIndex] === pane) {
         win.webContents.send('url-updated', newUrl);
       }
     }
@@ -277,34 +302,30 @@ function setupViewListeners(view, tabId, pane, win) {
     }
   });
   
-  if (pane === 'main') {
-    view.webContents.on('page-title-updated', (event, title) => {
-      const tab = state.tabs.get(tabId);
-      if (tab) {
+  view.webContents.on('page-title-updated', (event, title) => {
+    const tab = state.tabs.get(tabId);
+    if (tab && pane) {
+      pane.title = title;
+      const simplifiedPanes = tab.panes.map(p => ({ id: p.id, url: p.url, title: p.title }));
+      if (tab.panes[0] === pane) {
         tab.title = title;
-        win.webContents.send('tab-updated', { id: tabId, url: tab.url, title });
-        if (!win.isIncognito) {
-          recordHistory(tab.url, title);
-        }
+        win.webContents.send('tab-updated', { id: tabId, url: pane.url, title, panes: simplifiedPanes });
+      } else {
+        win.webContents.send('tab-updated', { id: tabId, url: tab.panes[0].url, title: tab.title, panes: simplifiedPanes });
       }
-    });
-  } else {
-    view.webContents.on('page-title-updated', (event, title) => {
-      const tab = state.tabs.get(tabId);
-      if (tab) {
-        if (!win.isIncognito) {
-          recordHistory(tab.splitUrl, title);
-        }
+      if (!win.isIncognito) {
+        recordHistory(pane.url, title);
       }
-    });
-  }
+    }
+  });
   
   view.webContents.on('focus', () => {
     const tab = state.tabs.get(tabId);
-    if (tab) {
-      tab.activePane = pane;
+    if (tab && pane) {
+      const idx = tab.panes.indexOf(pane);
+      if (idx !== -1) tab.activePaneIndex = idx;
       if (tabId === state.activeTabId) {
-        win.webContents.send('url-updated', pane === 'main' ? tab.url : tab.splitUrl);
+        win.webContents.send('url-updated', pane.url);
       }
     }
   });
@@ -329,25 +350,37 @@ function setupViewListeners(view, tabId, pane, win) {
   });
 }
 
-function createTab(url, win) {
-  if (!url) url = getHomepageUrl();
-  const state = getWindowState(win);
-  const id = `tab-${tabIdCounter++}`;
+function createPane(url, win, tabId) {
   const view = new WebContentsView({
     webPreferences: {
       preload: path.join(__dirname, 'preload-tab.js'),
       contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      enableRemoteModule: false,
+      navigateOnDragDrop: false,
+      v8CacheOptions: 'bypassHeatCheck',
       autoplayPolicy: 'no-user-gesture-required'
     }
   });
   view.setBackgroundColor('#FFFFFF');
   setupGlobalShortcuts(view.webContents, win);
-  
-  state.tabs.set(id, { id, view, splitView: null, activePane: 'main', url, splitUrl: '', title: 'New Tab' });
-  setupViewListeners(view, id, 'main', win);
+  const paneId = Math.random().toString(36).substr(2, 9);
+  const pane = { id: paneId, view, url, title: 'Loading...' };
+  setupViewListeners(view, tabId, pane, win);
   view.webContents.loadURL(url);
+  return pane;
+}
+
+function createTab(url, win) {
+  if (!url) url = getHomepageUrl();
+  const state = getWindowState(win);
+  const id = `tab-${tabIdCounter++}`;
   
-  win.webContents.send('tab-created', { id, url, title: 'Loading...' });
+  const pane = createPane(url, win, id);
+  state.tabs.set(id, { id, panes: [pane], activePaneIndex: 0, title: 'Loading...', splitX: 0.5, splitY: 0.5 });
+  
+  win.webContents.send('tab-created', { id, url, title: 'Loading...', panes: [{ id: pane.id, url, title: 'Loading...' }] });
   switchTab(id, win);
 }
 
@@ -357,19 +390,22 @@ function switchTab(id, win) {
   
   if (state.activeTabId && state.tabs.has(state.activeTabId)) {
     const oldTab = state.tabs.get(state.activeTabId);
-    win.contentView.removeChildView(oldTab.view);
-    if (oldTab.splitView) win.contentView.removeChildView(oldTab.splitView);
+    oldTab.panes.forEach(p => {
+      try { win.contentView.removeChildView(p.view); } catch(e){}
+    });
   }
   
   state.activeTabId = id;
   const newTab = state.tabs.get(id);
-  win.contentView.addChildView(newTab.view);
-  if (newTab.splitView) win.contentView.addChildView(newTab.splitView);
+  newTab.panes.forEach(p => {
+    win.contentView.addChildView(p.view);
+  });
   
   updateViewBounds(win);
   
   win.webContents.send('tab-switched', id);
-  win.webContents.send('url-updated', newTab.activePane === 'main' ? newTab.url : newTab.splitUrl);
+  const activePane = newTab.panes[newTab.activePaneIndex];
+  if (activePane) win.webContents.send('url-updated', activePane.url);
 }
 
 function closeTab(id, win) {
@@ -378,15 +414,15 @@ function closeTab(id, win) {
   const tabToClose = state.tabs.get(id);
   
   if (state.activeTabId === id) {
-    win.contentView.removeChildView(tabToClose.view);
-    if (tabToClose.splitView) win.contentView.removeChildView(tabToClose.splitView);
+    tabToClose.panes.forEach(p => {
+      try { win.contentView.removeChildView(p.view); } catch(e){}
+    });
     state.activeTabId = null;
   }
   
-  try { tabToClose.view.webContents.close(); } catch(e){}
-  if (tabToClose.splitView) {
-    try { tabToClose.splitView.webContents.close(); } catch(e){}
-  }
+  tabToClose.panes.forEach(p => {
+    try { p.view.webContents.close(); } catch(e){}
+  });
   
   state.tabs.delete(id);
   win.webContents.send('tab-closed', id);
@@ -403,35 +439,27 @@ function toggleSplitView(id, win) {
   const tab = state.tabs.get(id);
   if (!tab) return;
   
-  if (tab.splitView) {
-    if (state.activeTabId === id) {
-      win.contentView.removeChildView(tab.splitView);
-    }
-    tab.splitView = null;
-    tab.activePane = 'main';
-    updateViewBounds(win);
-    win.webContents.send('url-updated', tab.url);
-  } else {
-    tab.splitView = new WebContentsView({
-      webPreferences: {
-        preload: path.join(__dirname, 'preload-tab.js'),
-        contextIsolation: true,
-        autoplayPolicy: 'no-user-gesture-required'
+  if (tab.panes.length > 1) {
+    const panesToRemove = tab.panes.splice(1);
+    panesToRemove.forEach(p => {
+      if (state.activeTabId === id) {
+        try { win.contentView.removeChildView(p.view); } catch(e){}
       }
+      try { p.view.webContents.close(); } catch(e){}
     });
-    tab.splitView.setBackgroundColor('#FFFFFF');
-    setupGlobalShortcuts(tab.splitView.webContents, win);
-    tab.splitUrl = getHomepageUrl();
-    setupViewListeners(tab.splitView, id, 'split', win);
-    tab.splitView.webContents.loadURL(tab.splitUrl);
-    
+    tab.activePaneIndex = 0;
+  } else {
+    const newPane = createPane(getHomepageUrl(), win, id);
+    tab.panes.push(newPane);
     if (state.activeTabId === id) {
-      win.contentView.addChildView(tab.splitView);
+      win.contentView.addChildView(newPane.view);
     }
-    tab.activePane = 'split'; 
-    updateViewBounds(win);
-    win.webContents.send('url-updated', tab.splitUrl);
+    tab.activePaneIndex = tab.panes.length - 1;
   }
+  
+  updateViewBounds(win);
+  const activePane = tab.panes[tab.activePaneIndex];
+  if (activePane) win.webContents.send('url-updated', activePane.url);
 }
 
 function showPalette(win) {
@@ -492,11 +520,16 @@ function createBrowserWindow(isIncognito = false) {
     vibrancy: 'fullscreen-ui',
     backgroundColor: '#00000000',
     icon: path.join(__dirname, 'icon.png'),
+    show: false,
     webPreferences: {
       partition: isIncognito ? 'in-memory' : 'persist:default',
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true,
+      enableRemoteModule: false,
+      navigateOnDragDrop: false,
+      v8CacheOptions: 'bypassHeatCheck'
     }
   });
   
@@ -506,28 +539,28 @@ function createBrowserWindow(isIncognito = false) {
   
   state.paletteWindow = new BrowserWindow({
     width: 600, height: 450, parent: win, frame: false, backgroundColor: '#1E1E1E', show: false, skipTaskbar: true,
-    webPreferences: { preload: path.join(__dirname, 'preload-palette.js'), contextIsolation: true, nodeIntegration: false }
+    webPreferences: { preload: path.join(__dirname, 'preload-palette.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, enableRemoteModule: false, navigateOnDragDrop: false, v8CacheOptions: 'bypassHeatCheck' }
   });
   state.paletteWindow.loadFile(path.join(__dirname, 'palette.html'));
   state.paletteWindow.on('blur', () => state.paletteWindow.hide());
 
   state.syncWindow = new BrowserWindow({
     width: 350, height: 380, parent: win, frame: false, backgroundColor: '#1E1E1E', show: false, skipTaskbar: true,
-    webPreferences: { preload: path.join(__dirname, 'preload-sync.js'), contextIsolation: true, nodeIntegration: false }
+    webPreferences: { preload: path.join(__dirname, 'preload-sync.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, enableRemoteModule: false, navigateOnDragDrop: false, v8CacheOptions: 'bypassHeatCheck' }
   });
   state.syncWindow.loadFile(path.join(__dirname, 'sync.html'));
   state.syncWindow.on('blur', () => state.syncWindow.hide());
 
   state.downloadsWindow = new BrowserWindow({
     width: 350, height: 400, parent: win, frame: false, backgroundColor: '#1E1E1E', show: false, skipTaskbar: true,
-    webPreferences: { preload: path.join(__dirname, 'preload-downloads.js'), contextIsolation: true, nodeIntegration: false }
+    webPreferences: { preload: path.join(__dirname, 'preload-downloads.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, enableRemoteModule: false, navigateOnDragDrop: false, v8CacheOptions: 'bypassHeatCheck' }
   });
   state.downloadsWindow.loadFile(path.join(__dirname, 'downloads.html'));
   state.downloadsWindow.on('blur', () => state.downloadsWindow.hide());
 
   state.welcomeWindow = new BrowserWindow({
     width: 800, height: 600, parent: win, modal: true, frame: false, transparent: true, show: false, skipTaskbar: true,
-    webPreferences: { preload: path.join(__dirname, 'preload-welcome.js'), contextIsolation: true, nodeIntegration: false }
+    webPreferences: { preload: path.join(__dirname, 'preload-welcome.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, enableRemoteModule: false, navigateOnDragDrop: false, v8CacheOptions: 'bypassHeatCheck' }
   });
   state.welcomeWindow.loadFile(path.join(__dirname, 'welcome.html'));
 
@@ -553,6 +586,14 @@ function createBrowserWindow(isIncognito = false) {
   });
 
   win.loadFile(path.join(__dirname, 'index.html'));
+  
+  win.webContents.on('will-navigate', (event, url) => {
+    // Only allow index.html navigation, block all other URLs (e.g. from Drag & Drop)
+    if (!url.includes('index.html')) {
+      event.preventDefault();
+    }
+  });
+  
   setupGlobalShortcuts(win.webContents, win);
 }
 
@@ -627,12 +668,9 @@ ipcMain.on('modal-opened', (event) => {
   const state = getWindowState(win);
   if (state.activeTabId && state.tabs.has(state.activeTabId)) {
     const tab = state.tabs.get(state.activeTabId);
-    if (tab.view) {
-      try { win.contentView.removeChildView(tab.view); } catch(e) {}
-    }
-    if (tab.splitView) {
-      try { win.contentView.removeChildView(tab.splitView); } catch(e) {}
-    }
+    tab.panes.forEach(p => {
+      try { win.contentView.removeChildView(p.view); } catch(e) {}
+    });
   }
 });
 
@@ -642,12 +680,9 @@ ipcMain.on('modal-closed', (event) => {
   const state = getWindowState(win);
   if (state.activeTabId && state.tabs.has(state.activeTabId)) {
     const tab = state.tabs.get(state.activeTabId);
-    if (tab.view) {
-      try { win.contentView.addChildView(tab.view); } catch(e) {}
-    }
-    if (tab.splitView) {
-      try { win.contentView.addChildView(tab.splitView); } catch(e) {}
-    }
+    tab.panes.forEach(p => {
+      try { win.contentView.addChildView(p.view); } catch(e) {}
+    });
   }
 });
 
@@ -687,7 +722,9 @@ ipcMain.on('navigate', (event, url) => {
   const state = getWindowState(win);
   if (!state.activeTabId || !state.tabs.has(state.activeTabId)) return;
   const tab = state.tabs.get(state.activeTabId);
-  const wc = tab.activePane === 'main' ? tab.view.webContents : (tab.splitView ? tab.splitView.webContents : tab.view.webContents);
+  const activePane = tab.panes[tab.activePaneIndex];
+  if (!activePane) return;
+  const wc = activePane.view.webContents;
   
   let finalUrl = url.trim();
   if (finalUrl === '') return;
@@ -707,7 +744,9 @@ ipcMain.on('go-back', (event) => {
   const state = getWindowState(win);
   if (!state.activeTabId || !state.tabs.has(state.activeTabId)) return;
   const tab = state.tabs.get(state.activeTabId);
-  const wc = tab.activePane === 'main' ? tab.view.webContents : (tab.splitView ? tab.splitView.webContents : tab.view.webContents);
+  const activePane = tab.panes[tab.activePaneIndex];
+  if (!activePane) return;
+  const wc = activePane.view.webContents;
   if (wc && wc.canGoBack()) wc.goBack();
 });
 
@@ -717,7 +756,9 @@ ipcMain.on('go-forward', (event) => {
   const state = getWindowState(win);
   if (!state.activeTabId || !state.tabs.has(state.activeTabId)) return;
   const tab = state.tabs.get(state.activeTabId);
-  const wc = tab.activePane === 'main' ? tab.view.webContents : (tab.splitView ? tab.splitView.webContents : tab.view.webContents);
+  const activePane = tab.panes[tab.activePaneIndex];
+  if (!activePane) return;
+  const wc = activePane.view.webContents;
   if (wc && wc.canGoForward()) wc.goForward();
 });
 
@@ -727,7 +768,9 @@ ipcMain.on('reload', (event) => {
   const state = getWindowState(win);
   if (!state.activeTabId || !state.tabs.has(state.activeTabId)) return;
   const tab = state.tabs.get(state.activeTabId);
-  const wc = tab.activePane === 'main' ? tab.view.webContents : (tab.splitView ? tab.splitView.webContents : tab.view.webContents);
+  const activePane = tab.panes[tab.activePaneIndex];
+  if (!activePane) return;
+  const wc = activePane.view.webContents;
   if (wc) wc.reload();
 });
 
@@ -751,6 +794,168 @@ ipcMain.on('toggle-split', (event) => {
   if (!win) return;
   const state = getWindowState(win);
   if (state.activeTabId) toggleSplitView(state.activeTabId, win);
+});
+
+ipcMain.on('set-drag-mode', (event, isDragging) => {
+  const win = getMainWindowFromEvent(event);
+  if (!win) return;
+  const state = getWindowState(win);
+  state.dragMode = isDragging;
+  updateViewBounds(win);
+});
+
+ipcMain.on('merge-tabs', (event, { sourceId, targetId, region }) => {
+  const win = getMainWindowFromEvent(event);
+  if (!win) return;
+  const state = getWindowState(win);
+  if (!state.tabs.has(sourceId) || !state.tabs.has(targetId)) return;
+  
+  const sourceTab = state.tabs.get(sourceId);
+  const targetTab = state.tabs.get(targetId);
+  
+  const oldPanesUrls = sourceTab.panes.map(p => p.url);
+  
+  sourceTab.panes.forEach(p => {
+    if (state.activeTabId === sourceId) {
+      try { win.contentView.removeChildView(p.view); } catch(e){}
+    }
+    try { p.view.webContents.close(); } catch(e){}
+  });
+  
+  state.tabs.delete(sourceId);
+  win.webContents.send('tab-closed', sourceId);
+  
+  oldPanesUrls.forEach(url => {
+    const newPane = createPane(url, win, targetId);
+    targetTab.panes.push(newPane);
+    if (state.activeTabId === targetId) {
+      win.contentView.addChildView(newPane.view);
+    }
+  });
+  
+  targetTab.activePaneIndex = targetTab.panes.length - 1;
+  updateViewBounds(win);
+  switchTab(targetId, win);
+});
+
+ipcMain.on('set-split-ratio', (event, { mouseX, mouseY }) => {
+  const win = getMainWindowFromEvent(event);
+  if (!win) return;
+  const state = getWindowState(win);
+  if (!state.activeTabId || !state.tabs.has(state.activeTabId)) return;
+  const tab = state.tabs.get(state.activeTabId);
+
+  const bounds = win.getContentBounds();
+  const effSidebarWidth = (settings.compactMode && !state.sidebarHovered) ? 60 : SIDEBAR_WIDTH;
+  const isRight = settings.sidebarPos === 'right';
+  const viewX = isRight ? 0 : effSidebarWidth;
+  const effWidth = bounds.width - effSidebarWidth;
+  const effHeight = bounds.height - TITLEBAR_HEIGHT;
+  const viewY = TITLEBAR_HEIGHT;
+
+  if (mouseX !== undefined) {
+    let rawX = mouseX - viewX;
+    let ratio = rawX / effWidth;
+    if (ratio < 0.1) ratio = 0.1;
+    if (ratio > 0.9) ratio = 0.9;
+    tab.splitX = ratio;
+  }
+  
+  if (mouseY !== undefined) {
+    let rawY = mouseY - viewY;
+    let ratio = rawY / effHeight;
+    if (ratio < 0.1) ratio = 0.1;
+    if (ratio > 0.9) ratio = 0.9;
+    tab.splitY = ratio;
+  }
+  
+  updateViewBounds(win);
+});
+
+ipcMain.on('close-pane', (event, { tabId, paneId }) => {
+  const win = getMainWindowFromEvent(event);
+  if (!win) return;
+  const state = getWindowState(win);
+  if (!state.tabs.has(tabId)) return;
+  
+  const tab = state.tabs.get(tabId);
+  const paneIndex = tab.panes.findIndex(p => p.id === paneId);
+  if (paneIndex === -1) return;
+  
+  const pane = tab.panes[paneIndex];
+  if (state.activeTabId === tabId) {
+    try { win.contentView.removeChildView(pane.view); } catch(e){}
+  }
+  try { pane.view.webContents.close(); } catch(e){}
+  
+  tab.panes.splice(paneIndex, 1);
+  
+  if (tab.panes.length === 0) {
+    closeTab(tabId, win);
+  } else {
+    if (tab.activePaneIndex >= tab.panes.length) {
+      tab.activePaneIndex = tab.panes.length - 1;
+    }
+    const simplifiedPanes = tab.panes.map(p => ({ id: p.id, url: p.url, title: p.title }));
+    win.webContents.send('tab-updated', { id: tabId, url: tab.panes[0].url, title: tab.title, panes: simplifiedPanes });
+    updateViewBounds(win);
+  }
+});
+
+ipcMain.on('reposition-pane', (event, { paneId, targetTabId, region }) => {
+  const win = getMainWindowFromEvent(event);
+  if (!win) return;
+  const state = getWindowState(win);
+  
+  let sourceTab = null;
+  let paneObj = null;
+  let paneIndex = -1;
+  
+  // Find pane
+  for (const [tId, tab] of state.tabs) {
+    paneIndex = tab.panes.findIndex(p => p.id === paneId);
+    if (paneIndex !== -1) {
+      sourceTab = tab;
+      paneObj = tab.panes[paneIndex];
+      break;
+    }
+  }
+  if (!sourceTab || !paneObj || !state.tabs.has(targetTabId)) return;
+  
+  const targetTab = state.tabs.get(targetTabId);
+  
+  // Remove from source
+  if (state.activeTabId === sourceTab.id) {
+    try { win.contentView.removeChildView(paneObj.view); } catch(e){}
+  }
+  sourceTab.panes.splice(paneIndex, 1);
+  
+  if (sourceTab.panes.length === 0) {
+    state.tabs.delete(sourceTab.id);
+    win.webContents.send('tab-closed', sourceTab.id);
+  } else {
+    if (sourceTab.activePaneIndex >= sourceTab.panes.length) sourceTab.activePaneIndex = Math.max(0, sourceTab.panes.length - 1);
+    const simplifiedPanes = sourceTab.panes.map(p => ({ id: p.id, url: p.url, title: p.title }));
+    win.webContents.send('tab-updated', { id: sourceTab.id, url: sourceTab.panes[0].url, title: sourceTab.title, panes: simplifiedPanes });
+  }
+  
+  // Add to target
+  // Just recreate view instead of migrating, or we can just push the object?
+  // We can push the object directly! It already has the webContents.
+  targetTab.panes.push(paneObj);
+  if (state.activeTabId === targetTab.id) {
+    win.contentView.addChildView(paneObj.view);
+  }
+  
+  targetTab.activePaneIndex = targetTab.panes.length - 1;
+  
+  const targetSimplifiedPanes = targetTab.panes.map(p => ({ id: p.id, url: p.url, title: p.title }));
+  win.webContents.send('tab-updated', { id: targetTab.id, url: targetTab.panes[0].url, title: targetTab.title, panes: targetSimplifiedPanes });
+  
+  updateViewBounds(win);
+  if (state.activeTabId !== targetTab.id) {
+    switchTab(targetTab.id, win);
+  }
 });
 
 ipcMain.on('open-sync', (event) => {
@@ -987,6 +1192,28 @@ if (!gotTheLock) {
   session.defaultSession.setUserAgent(cleanUA);
   session.fromPartition('in-memory').setUserAgent(cleanUA);
 
+  // Implement Native Permission Handler for Security & Privacy
+  const handlePermission = (webContents, permission, callback) => {
+    const sensitivePermissions = ['media', 'geolocation', 'notifications', 'camera', 'microphone'];
+    if (sensitivePermissions.includes(permission)) {
+      dialog.showMessageBox({
+        type: 'question',
+        buttons: ['Allow', 'Deny'],
+        defaultId: 1, // Default to Deny
+        title: 'Privacy & Security Alert',
+        message: `A website is requesting access to your ${permission}.`,
+        detail: `Requested by: ${webContents.getURL()}`
+      }).then(({ response }) => {
+        callback(response === 0); // 0 is Allow
+      }).catch(() => callback(false));
+    } else {
+      callback(false); // Deny all other unknown/dangerous permissions (e.g. midi, pointerLock)
+    }
+  };
+  
+  session.defaultSession.setPermissionRequestHandler(handlePermission);
+  session.fromPartition('in-memory').setPermissionRequestHandler(handlePermission);
+
   const chromeVersionMatch = cleanUA.match(/Chrome\/(\d+)/);
   const chromeVersion = chromeVersionMatch ? chromeVersionMatch[1] : '123';
   const secChUa = `"Google Chrome";v="${chromeVersion}", "Not:A-Brand";v="8", "Chromium";v="${chromeVersion}"`;
@@ -1045,8 +1272,8 @@ if (!gotTheLock) {
           
           let tabIdToClose = null;
           for (const [id, tab] of state.tabs) {
-            if ((tab.view && tab.view.webContents === webContents) ||
-                (tab.splitView && tab.splitView.webContents === webContents)) {
+            const hasPane = tab.panes.some(p => p.view && p.view.webContents === webContents);
+            if (hasPane) {
               if (!webContents.navigationHistory.canGoBack()) {
                 tabIdToClose = id;
               }
