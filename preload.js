@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('api', {
   sidebarHover: (hovered) => ipcRenderer.send('sidebar-hover', hovered),
 
   // Tab Management
+  getTabs: () => ipcRenderer.invoke('get-tabs'),
   newTab: () => ipcRenderer.send('new-tab'),
   switchTab: (id) => ipcRenderer.send('switch-tab', id),
   closeTab: (id) => ipcRenderer.send('close-tab', id),
@@ -44,6 +45,7 @@ contextBridge.exposeInMainWorld('api', {
   clearHistory: () => ipcRenderer.invoke('clear-history'),
   deleteHistoryItem: (index) => ipcRenderer.invoke('delete-history-item', index),
   deleteBookmark: (index) => ipcRenderer.invoke('delete-bookmark', index),
+  onHistoryUpdated: (callback) => ipcRenderer.on('history-updated', (_event, history) => callback(history)),
 
   // Sync
   authRegister: (username, password) => ipcRenderer.invoke('auth-register', { username, password }),

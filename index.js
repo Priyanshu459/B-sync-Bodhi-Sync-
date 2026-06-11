@@ -98,11 +98,15 @@ function loadData() {
   try { if (fs.existsSync(vaultPath)) vault = JSON.parse(fs.readFileSync(vaultPath, 'utf8')); } catch(e){}
   try { if (fs.existsSync(settingsPath)) settings = Object.assign(settings, JSON.parse(fs.readFileSync(settingsPath, 'utf8'))); } catch(e){}
 }
+let saveTimeout = null;
 function saveData() {
-  fs.writeFile(bookmarksPath, JSON.stringify(bookmarks), () => {});
-  fs.writeFile(historyPath, JSON.stringify(history), () => {});
-  fs.writeFile(vaultPath, JSON.stringify(vault), () => {});
-  fs.writeFile(settingsPath, JSON.stringify(settings), () => {});
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    fs.writeFile(bookmarksPath, JSON.stringify(bookmarks), () => {});
+    fs.writeFile(historyPath, JSON.stringify(history), () => {});
+    fs.writeFile(vaultPath, JSON.stringify(vault), () => {});
+    fs.writeFile(settingsPath, JSON.stringify(settings), () => {});
+  }, 2000);
 }
 
 function getSearchUrl(query) {
@@ -122,6 +126,10 @@ function recordHistory(url, title) {
   history.unshift({ url, title, timestamp: Date.now() });
   if (history.length > 500) history.pop();
   saveData();
+  
+  BrowserWindow.getAllWindows().forEach(win => {
+    win.webContents.send('history-updated', history);
+  });
 }
 
 let tabIdCounter = 0;
@@ -173,6 +181,24 @@ function setupGlobalShortcuts(wc, win) {
     if ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'j' && input.type === 'keyDown') {
       event.preventDefault();
       win.webContents.openDevTools({ mode: 'detach' });
+    }
+    
+    // Full screen shortcuts
+    if (input.key === 'F11' && input.type === 'keyDown') {
+      event.preventDefault();
+      const isFull = win.isFullScreen();
+      const state = getWindowState(win);
+      if (state) state.isHtmlFullScreen = !isFull;
+      win.setFullScreen(!isFull);
+      updateViewBounds(win);
+    }
+    if (input.key === 'Escape' && input.type === 'keyDown') {
+      const state = getWindowState(win);
+      if (state && state.isHtmlFullScreen) {
+        state.isHtmlFullScreen = false;
+        win.setFullScreen(false);
+        updateViewBounds(win);
+      }
     }
   });
 }
@@ -568,7 +594,27 @@ function createBrowserWindow(isIncognito = false) {
   win.on('maximize', () => updateViewBounds(win));
   win.on('unmaximize', () => updateViewBounds(win));
   win.on('enter-full-screen', () => updateViewBounds(win));
-  win.on('leave-full-screen', () => updateViewBounds(win));
+  win.on('leave-full-screen', () => {
+    updateViewBounds(win);
+    // Workaround for Windows titleBarStyle: 'hidden' taskbar bug
+    if (process.platform === 'win32') {
+      setTimeout(() => {
+        // Toggle resizable and alwaysOnTop to force Windows to recalculate borders
+        const resizable = win.isResizable();
+        win.setAlwaysOnTop(true);
+        win.setResizable(!resizable);
+        win.setAlwaysOnTop(false);
+        win.setResizable(resizable);
+        
+        // Jitter bounds slightly if not maximized to force resize update
+        if (!win.isMaximized()) {
+          const b = win.getBounds();
+          win.setBounds({ ...b, height: b.height - 1 });
+          win.setBounds(b);
+        }
+      }, 100);
+    }
+  });
   
   win.once('ready-to-show', () => {
     win.show();
@@ -627,6 +673,24 @@ ipcMain.handle('get-search-url', (event, query) => {
 ipcMain.handle('get-window-source-id', (event) => {
   const win = getMainWindowFromEvent(event);
   return win ? win.getMediaSourceId() : null;
+});
+
+ipcMain.handle('get-tabs', (event) => {
+  const win = getMainWindowFromEvent(event);
+  if (!win) return { tabs: [], activeTabId: null };
+  const state = getWindowState(win);
+  if (!state) return { tabs: [], activeTabId: null };
+  
+  const simplifiedTabs = [];
+  for (const tab of state.tabs.values()) {
+    simplifiedTabs.push({
+      id: tab.id,
+      title: tab.title,
+      url: tab.panes[0] ? tab.panes[0].url : '',
+      panes: tab.panes.map(p => ({ id: p.id, url: p.url, title: p.title }))
+    });
+  }
+  return { tabs: simplifiedTabs, activeTabId: state.activeTabId };
 });
 
 ipcMain.handle('save-recording', async (event, buffer) => {
@@ -1194,8 +1258,10 @@ if (!gotTheLock) {
 
   // Implement Native Permission Handler for Security & Privacy
   const handlePermission = (webContents, permission, callback) => {
-    const sensitivePermissions = ['media', 'geolocation', 'notifications', 'camera', 'microphone'];
-    if (sensitivePermissions.includes(permission)) {
+    const interactivePermissions = ['media', 'camera', 'microphone'];
+    if (permission === 'fullscreen') {
+      callback(true); // Auto-allow full screen
+    } else if (interactivePermissions.includes(permission)) {
       dialog.showMessageBox({
         type: 'question',
         buttons: ['Allow', 'Deny'],
@@ -1207,7 +1273,7 @@ if (!gotTheLock) {
         callback(response === 0); // 0 is Allow
       }).catch(() => callback(false));
     } else {
-      callback(false); // Deny all other unknown/dangerous permissions (e.g. midi, pointerLock)
+      callback(false); // Silently deny notifications, geolocation, and other permissions to prevent annoying popups on load
     }
   };
   
@@ -1234,18 +1300,30 @@ if (!gotTheLock) {
     try {
       const { ElectronBlocker } = require('@ghostery/adblocker-electron');
       
-      const blocker = await ElectronBlocker.fromPrebuiltAdsOnly(fetch);
+      const blocker = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
       
       try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) {}
       try { blocker.enableBlockingInSession(session.fromPartition('in-memory')); } catch (e) {}
       
-      // Remove Ghostery's aggressive preload script to prevent Next.js crashes on AI sites (ChatGPT/Claude)
+      // Wrap Ghostery's preload script to prevent Next.js crashes on AI sites (ChatGPT/Claude) while keeping YouTube adblocking
       [session.defaultSession, session.fromPartition('in-memory')].forEach(s => {
         try {
           const preloads = s.getPreloads();
-          const cleanPreloads = preloads.filter(p => !p.includes('adblocker'));
-          s.setPreloads(cleanPreloads);
-        } catch (err) { console.log(err); }
+          const ghosteryPreloadPath = preloads.find(p => p.includes('adblocker'));
+          if (ghosteryPreloadPath) {
+             const fs = require('fs');
+             const path = require('path');
+             const ghosteryCode = fs.readFileSync(ghosteryPreloadPath, 'utf8');
+             // We inject a hostname check to prevent monkey-patching on known crashing sites
+             const customCode = `if (!window.location.hostname.includes('chatgpt.com') && !window.location.hostname.includes('claude.ai')) {\n${ghosteryCode}\n}`;
+             const customPreloadPath = path.join(app.getPath('userData'), 'custom-adblocker-preload.js');
+             fs.writeFileSync(customPreloadPath, customCode);
+             
+             const cleanPreloads = preloads.filter(p => !p.includes('adblocker'));
+             cleanPreloads.push(customPreloadPath);
+             s.setPreloads(cleanPreloads);
+          }
+        } catch (err) { console.log('Preload wrapper error:', err); }
       });
       
       console.log('Ghostery adblocker-electron initialized for all sessions!');

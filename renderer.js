@@ -135,6 +135,16 @@ window.api.getData().then(data => {
   renderLibrary();
 });
 
+if (window.api.getTabs) {
+  window.api.getTabs().then(data => {
+    if (data && data.tabs) {
+      data.tabs.forEach(t => tabs.set(t.id, t));
+      if (data.activeTabId) activeTabId = data.activeTabId;
+      renderTabs();
+    }
+  });
+}
+
 // Navigation
 addressBar.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
@@ -187,58 +197,87 @@ btnIncognito.addEventListener('click', () => {
 });
 
 function renderTabs() {
-  tabsContainer.innerHTML = '';
+  const existingTabIds = new Set(Array.from(tabsContainer.querySelectorAll('.tab')).map(el => el.dataset.tabId));
+  
   tabs.forEach((tab, id) => {
-    const tabEl = document.createElement('div');
-    tabEl.className = `tab ${id === activeTabId ? 'active' : ''}`;
-    tabEl.draggable = true;
+    existingTabIds.delete(id);
+    let tabEl = tabsContainer.querySelector(`.tab[data-tab-id="${id}"]`);
     
-    tabEl.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', id);
-      tabEl.classList.add('dragging');
-      const overlay = document.getElementById('drag-overlay');
-      if (overlay) overlay.classList.remove('hidden');
-      if (window.api.setDragMode) window.api.setDragMode(true);
-    });
-    
-    tabEl.addEventListener('dragend', () => {
-      tabEl.classList.remove('dragging');
-      const overlay = document.getElementById('drag-overlay');
-      if (overlay) overlay.classList.add('hidden');
-      if (window.api.setDragMode) window.api.setDragMode(false);
-    });
-    
-    tabEl.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      tabEl.classList.add('drag-over');
-    });
-    
-    tabEl.addEventListener('dragleave', () => {
-      tabEl.classList.remove('drag-over');
-    });
-    
-    tabEl.addEventListener('drop', (e) => {
-      e.preventDefault();
-      tabEl.classList.remove('drag-over');
-      const draggedId = e.dataTransfer.getData('text/plain');
-      if (draggedId && draggedId !== id) {
-        // Reorder map entries by rebuilding the map
-        const newTabs = new Map();
-        const draggedTab = tabs.get(draggedId);
-        if (draggedTab) {
-          tabs.forEach((t, tId) => {
-            if (tId === id) newTabs.set(draggedId, draggedTab); // Insert before
-            if (tId !== draggedId) newTabs.set(tId, t);
-          });
-          
-          tabs = newTabs;
-          renderTabs();
+    if (!tabEl) {
+      tabEl = document.createElement('div');
+      tabEl.dataset.tabId = id;
+      tabEl.draggable = true;
+      
+      tabEl.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', id);
+        tabEl.classList.add('dragging');
+        const overlay = document.getElementById('drag-overlay');
+        if (overlay) overlay.classList.remove('hidden');
+        if (window.api.setDragMode) window.api.setDragMode(true);
+      });
+      
+      tabEl.addEventListener('dragend', () => {
+        tabEl.classList.remove('dragging');
+        const overlay = document.getElementById('drag-overlay');
+        if (overlay) overlay.classList.add('hidden');
+        if (window.api.setDragMode) window.api.setDragMode(false);
+      });
+      
+      tabEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        tabEl.classList.add('drag-over');
+      });
+      
+      tabEl.addEventListener('dragleave', () => {
+        tabEl.classList.remove('drag-over');
+      });
+      
+      tabEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        tabEl.classList.remove('drag-over');
+        const draggedId = e.dataTransfer.getData('text/plain');
+        if (draggedId && draggedId !== id) {
+          const newTabs = new Map();
+          const draggedTab = tabs.get(draggedId);
+          if (draggedTab) {
+            tabs.forEach((t, tId) => {
+              if (tId === id) newTabs.set(draggedId, draggedTab);
+              if (tId !== draggedId) newTabs.set(tId, t);
+            });
+            tabs = newTabs;
+            tabsContainer.innerHTML = ''; // Force full re-render on reorder
+            renderTabs();
+          }
         }
-      }
-    });
+      });
+      
+      const iconEl = document.createElement('img');
+      iconEl.className = 'tab-icon';
+      
+      const titleEl = document.createElement('span');
+      titleEl.className = 'tab-title';
+      
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'tab-close';
+      closeBtn.innerHTML = '<i class="ph ph-x"></i>';
+      closeBtn.title = 'Close tab';
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.api.closeTab(id);
+      });
+      
+      tabEl.addEventListener('click', () => {
+        if (id !== activeTabId) window.api.switchTab(id);
+      });
+      
+      tabEl.appendChild(iconEl);
+      tabEl.appendChild(titleEl);
+      tabEl.appendChild(closeBtn);
+    }
     
-    const iconEl = document.createElement('img');
-    iconEl.className = 'tab-icon';
+    tabEl.className = `tab ${id === activeTabId ? 'active' : ''}`;
+    const iconEl = tabEl.querySelector('.tab-icon');
+    
     if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('file://')) {
       try {
         const urlObj = new URL(tab.url);
@@ -251,32 +290,19 @@ function renderTabs() {
       iconEl.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%2318181b"/><text x="50%25" y="50%25" font-family="monospace" font-weight="bold" font-size="55" fill="%23fafafa" text-anchor="middle" dominant-baseline="central">B</text><circle cx="80" cy="20" r="8" fill="%2310b981"/></svg>';
     }
     
-    const titleEl = document.createElement('span');
-    titleEl.className = 'tab-title';
+    const titleEl = tabEl.querySelector('.tab-title');
     titleEl.textContent = tab.title || 'New Tab';
     titleEl.title = tab.title || 'New Tab';
     
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'tab-close';
-    closeBtn.innerHTML = '<i class="ph ph-x"></i>';
-    closeBtn.title = 'Close tab';
-    closeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      window.api.closeTab(id);
-    });
-    
-    tabEl.addEventListener('click', () => {
-      if (id !== activeTabId) window.api.switchTab(id);
-    });
-    
-    tabEl.appendChild(iconEl);
-    tabEl.appendChild(titleEl);
-    tabEl.appendChild(closeBtn);
     tabsContainer.appendChild(tabEl);
     
-    // Render pane sub-items if there are multiple panes
+    let panesContainer = tabEl.nextElementSibling;
+    if (panesContainer && panesContainer.classList.contains('pane-sub-items')) {
+      panesContainer.remove();
+    }
+    
     if (tab.panes && tab.panes.length > 1) {
-      const panesContainer = document.createElement('div');
+      panesContainer = document.createElement('div');
       panesContainer.className = 'pane-sub-items';
       tab.panes.forEach(pane => {
         const paneEl = document.createElement('div');
@@ -335,6 +361,15 @@ function renderTabs() {
       tabsContainer.appendChild(panesContainer);
     }
   });
+  
+  existingTabIds.forEach(id => {
+    const el = tabsContainer.querySelector(`.tab[data-tab-id="${id}"]`);
+    if (el) {
+      const next = el.nextElementSibling;
+      if (next && next.classList.contains('pane-sub-items')) next.remove();
+      el.remove();
+    }
+  });
 }
 
 window.api.onTabCreated((tab) => {
@@ -343,15 +378,18 @@ window.api.onTabCreated((tab) => {
 });
 
 window.api.onTabUpdated(async (tab) => {
-  if (tabs.has(tab.id)) {
-    tabs.set(tab.id, tab);
-    renderTabs();
-    libraryData = await window.api.getData(); // Refresh data to catch history
+  tabs.set(tab.id, tab);
+  renderTabs();
+});
+
+if (window.api.onHistoryUpdated) {
+  window.api.onHistoryUpdated((history) => {
+    libraryData.history = history;
     if (currentLibraryTab === 'history') {
       renderLibrary();
     }
-  }
-});
+  });
+}
 
 window.api.onTabSwitched((id) => {
   activeTabId = id;
